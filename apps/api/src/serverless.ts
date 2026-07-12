@@ -32,7 +32,7 @@ let appPromise: Promise<FastifyInstance> | null = null;
 
 async function getApp(): Promise<FastifyInstance> {
   if (!appPromise) {
-    appPromise = buildApp().then(async (app) => {
+    appPromise = buildApp({ serverless: true }).then(async (app) => {
       await app.ready();
       return app;
     });

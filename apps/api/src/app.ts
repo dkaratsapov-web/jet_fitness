@@ -18,15 +18,26 @@ import { env } from './env.js';
   return this.toString();
 };
 
-export async function buildApp(): Promise<FastifyInstance> {
+export interface BuildAppOptions {
+  /**
+   * Serverless mode: disable the pino logger. When the app is bundled (esbuild)
+   * for a Cloud Function, pino's thread-stream worker path breaks; skipping the
+   * logger instance avoids it entirely. Platform captures stdout regardless.
+   */
+  serverless?: boolean;
+}
+
+export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: {
-      level: env.nodeEnv === 'production' ? 'info' : 'debug',
-      transport:
-        env.nodeEnv === 'production'
-          ? undefined
-          : { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } },
-    },
+    logger: options.serverless
+      ? false
+      : {
+          level: env.nodeEnv === 'production' ? 'info' : 'debug',
+          transport:
+            env.nodeEnv === 'production'
+              ? undefined
+              : { target: 'pino-pretty', options: { translateTime: 'HH:MM:ss', ignore: 'pid,hostname' } },
+        },
     trustProxy: true,
   });
 
