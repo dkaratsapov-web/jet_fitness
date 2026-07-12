@@ -24,6 +24,7 @@ resource "yandex_iam_service_account" "app" {
 locals {
   sa_roles = [
     "serverless.functions.invoker", # API Gateway -> Function
+    "serverless.functions.admin",   # CI: create/update function versions
     "storage.admin",                # create buckets + set public-read on the app bucket
     "logging.writer",               # function logs
   ]
