@@ -51,32 +51,54 @@ jobs:
       - name: Package function
         run: bash infra/yandex/package-function.sh
 
+      # Deploy the pre-built zip (with node_modules) via yc CLI directly, so the
+      # bundled @prisma/client is uploaded verbatim (yc-actions dropped it via
+      # .gitignore filtering).
       - name: Deploy Cloud Function
-        uses: yc-actions/yc-sls-function@v3
-        with:
-          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
-          folder-id: ${{ secrets.YC_FOLDER_ID }}
-          function-name: jet-fitness-api
-          runtime: nodejs18
-          memory: 512Mb
-          entrypoint: handler.handler
-          execution-timeout: 30
-          source-root: apps/api/pkg
-          include: |
-            **/*
-          environment: |
-            NODE_ENV=production
-            ENABLE_TELEGRAM_WEBHOOK=${{ secrets.TELEGRAM_API_ROOT != '' }}
-            BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-            BOT_WEBHOOK_SECRET=${{ secrets.BOT_WEBHOOK_SECRET }}
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
-            INITDATA_TTL_SECONDS=86400
-            HEALTH_MODULE_ENABLED=false
-            S3_ENDPOINT=https://storage.yandexcloud.net
-            S3_BUCKET=${{ secrets.S3_UPLOADS_BUCKET }}
-            S3_KEY=${{ secrets.S3_KEY }}
-            S3_SECRET=${{ secrets.S3_SECRET }}
-            ${{ secrets.TELEGRAM_API_ROOT != '' && format('TELEGRAM_API_ROOT={0}', secrets.TELEGRAM_API_ROOT) || '' }}
+        env:
+          YC_SA_JSON: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          BOT_WEBHOOK_SECRET: ${{ secrets.BOT_WEBHOOK_SECRET }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          S3_UPLOADS_BUCKET: ${{ secrets.S3_UPLOADS_BUCKET }}
+          S3_KEY: ${{ secrets.S3_KEY }}
+          S3_SECRET: ${{ secrets.S3_SECRET }}
+          TELEGRAM_API_ROOT: ${{ secrets.TELEGRAM_API_ROOT }}
+        run: |
+          set -euo pipefail
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -n -i "$HOME/yc"
+          export PATH="$HOME/yc/bin:$PATH"
+          printf '%s' "$YC_SA_JSON" > /tmp/sa.json
+          yc config profile create ci >/dev/null 2>&1 || yc config profile activate ci
+          yc config set service-account-key /tmp/sa.json
+          yc config set folder-id "$YC_FOLDER_ID"
+
+          EXTRA=()
+          if [ -n "${TELEGRAM_API_ROOT:-}" ]; then
+            EXTRA+=(--environment "TELEGRAM_API_ROOT=$TELEGRAM_API_ROOT" --environment "ENABLE_TELEGRAM_WEBHOOK=true")
+          else
+            EXTRA+=(--environment "ENABLE_TELEGRAM_WEBHOOK=false")
+          fi
+
+          yc serverless function version create \
+            --function-name jet-fitness-api \
+            --runtime nodejs18 \
+            --entrypoint handler.handler \
+            --memory 512m \
+            --execution-timeout 30s \
+            --source-path apps/api/function.zip \
+            --environment "NODE_ENV=production" \
+            --environment "BOT_TOKEN=$BOT_TOKEN" \
+            --environment "BOT_WEBHOOK_SECRET=$BOT_WEBHOOK_SECRET" \
+            --environment "DATABASE_URL=$DATABASE_URL" \
+            --environment "INITDATA_TTL_SECONDS=86400" \
+            --environment "HEALTH_MODULE_ENABLED=false" \
+            --environment "S3_ENDPOINT=https://storage.yandexcloud.net" \
+            --environment "S3_BUCKET=$S3_UPLOADS_BUCKET" \
+            --environment "S3_KEY=$S3_KEY" \
+            --environment "S3_SECRET=$S3_SECRET" \
+            "${EXTRA[@]}"
 
       # ── 3. Mini App static -> Object Storage ────────────────
       - name: Build Mini App
