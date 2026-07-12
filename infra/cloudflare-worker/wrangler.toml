@@ -1,0 +1,14 @@
+# Cloudflare Worker relay config.
+# Deploy:  cd infra/cloudflare-worker && npx wrangler deploy
+# (first time:  npx wrangler login)
+
+name = "jet-fitness-relay"
+main = "relay.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+# Base URL of the Yandex API Gateway (fill in after the gateway is created).
+# Example: https://d5abcd1234.apigw.yandexcloud.net
+YANDEX_GATEWAY_URL = ""
+# Path Telegram posts updates to (matches the webhook URL you register).
+WEBHOOK_PATH = "/webhook"

@@ -40,6 +40,11 @@ export const env = {
   // If set, the API also serves the built Mini App static files from this
   // directory (single-origin mode — used by the Cloudflare tunnel demo stack).
   miniappDist: process.env.MINIAPP_DIST ?? '',
+
+  // Mount the Telegram webhook route in-process (serverless deploy: one Cloud
+  // Function serves both /api and /telegram/webhook). Off by default so the
+  // standalone bot service and local dev/tests don't double-handle updates.
+  enableTelegramWebhook: optional('ENABLE_TELEGRAM_WEBHOOK', 'false') === 'true',
 } as const;
 
 export type Env = typeof env;

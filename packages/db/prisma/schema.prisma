@@ -8,6 +8,10 @@
 
 generator client {
   provider = "prisma-client-js"
+  // "native" covers local dev; the Debian/OpenSSL-3 target is for the Yandex
+  // Cloud Function runtime (serverless deploy). Adjust the second target if the
+  // runtime reports a different platform (see infra/yandex/DEPLOY.md).
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

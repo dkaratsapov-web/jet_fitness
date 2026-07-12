@@ -9,6 +9,7 @@ import fastifyStatic from '@fastify/static';
 import authPlugin from './auth/authPlugin.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
+import { telegramRoutes } from './routes/telegram.js';
 import { env } from './env.js';
 
 // BigInt is not JSON-serializable by default; emit as string globally.
@@ -46,6 +47,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Routes
   await app.register(healthRoutes);
   await app.register(authRoutes, { prefix: '/api' });
+
+  // Serverless single-function mode: also handle the Telegram webhook here.
+  if (env.enableTelegramWebhook) {
+    await app.register(telegramRoutes);
+  }
 
   // Optional single-origin mode: also serve the built Mini App static files.
   await registerStatic(app);

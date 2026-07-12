@@ -17,6 +17,10 @@ apps/miniapp/dist/
 # Prisma
 packages/db/prisma/*.db
 
+# Serverless function packaging artifacts
+apps/api/pkg/
+apps/api/function.zip
+
 # Logs
 *.log
 npm-debug.log*

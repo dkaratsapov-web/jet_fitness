@@ -13,7 +13,11 @@ import { parseStartParam } from '@jet/shared';
 import { env } from './env.js';
 
 export function createBot(): Bot {
-  const bot = new Bot(env.botToken);
+  // apiRoot routes all outbound Telegram calls through the configured endpoint
+  // (Cloudflare Worker relay when api.telegram.org is unreachable from RF).
+  const bot = new Bot(env.botToken, {
+    client: { apiRoot: env.telegramApiRoot },
+  });
 
   bot.command('start', async (ctx) => {
     const from = ctx.from;
