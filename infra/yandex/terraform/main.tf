@@ -111,10 +111,11 @@ resource "yandex_mdb_postgresql_cluster" "main" {
       disk_type_id       = "network-ssd"
       disk_size          = var.pg_disk_size
     }
-    # Enable the built-in connection pooler (port 6432) — important for
-    # serverless functions that open many short-lived connections.
+    # Built-in connection pooler (port 6432). SESSION mode so Prisma's schema
+    # engine (migrations / db push) and prepared statements work — Yandex MDB
+    # does not expose a separate direct port externally.
     pooler_config {
-      pooling_mode = "TRANSACTION"
+      pooling_mode = "SESSION"
     }
   }
 
