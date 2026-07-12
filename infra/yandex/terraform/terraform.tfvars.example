@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+cloud_id    = "b1gn64sia7anaam25rdk"       # cloud-d-karatsapov
+folder_id   = "b1gljk9huj8ot3pn8g1c"       # default
+pg_password = "CHANGE-ME-strong-password"
+
+# Optional overrides:
+# zone               = "ru-central1-a"
+# pg_resource_preset = "b2.medium"
+# pg_disk_size       = 10

@@ -21,6 +21,15 @@ packages/db/prisma/*.db
 apps/api/pkg/
 apps/api/function.zip
 
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+infra/yandex/terraform/.build/
+crash.log
+
 # Logs
 *.log
 npm-debug.log*
