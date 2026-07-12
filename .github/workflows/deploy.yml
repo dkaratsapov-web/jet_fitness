@@ -74,6 +74,12 @@ jobs:
           yc config set service-account-key /tmp/sa.json
           yc config set folder-id "$YC_FOLDER_ID"
 
+          # The package exceeds the 3.5 MB direct-upload limit, so stage it in
+          # Object Storage and deploy from there.
+          AWS_ACCESS_KEY_ID="$S3_KEY" AWS_SECRET_ACCESS_KEY="$S3_SECRET" AWS_DEFAULT_REGION=ru-central1 \
+            aws s3 cp apps/api/function.zip "s3://$S3_UPLOADS_BUCKET/deploy/function.zip" \
+              --endpoint-url https://storage.yandexcloud.net
+
           EXTRA=()
           if [ -n "${TELEGRAM_API_ROOT:-}" ]; then
             EXTRA+=(--environment "TELEGRAM_API_ROOT=$TELEGRAM_API_ROOT" --environment "ENABLE_TELEGRAM_WEBHOOK=true")
@@ -87,7 +93,8 @@ jobs:
             --entrypoint handler.handler \
             --memory 512m \
             --execution-timeout 30s \
-            --source-path apps/api/function.zip \
+            --package-bucket-name "$S3_UPLOADS_BUCKET" \
+            --package-object-name "deploy/function.zip" \
             --environment "NODE_ENV=production" \
             --environment "BOT_TOKEN=$BOT_TOKEN" \
             --environment "BOT_WEBHOOK_SECRET=$BOT_WEBHOOK_SECRET" \
