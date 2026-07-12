@@ -1,0 +1,33 @@
+# Jet Fitness — all-in-one image for the Cloudflare tunnel demo.
+# Builds the Mini App static bundle AND runs the API, which serves that bundle
+# from the same origin (MINIAPP_DIST). The Mini App calls the API on relative
+# /api paths, so no public API URL needs to be baked in — the temporary tunnel
+# URL can change freely without a rebuild.
+
+FROM node:20-alpine
+WORKDIR /app
+RUN apk add --no-cache openssl
+
+# Install workspace deps.
+COPY package.json package-lock.json* ./
+COPY packages/db/package.json packages/db/
+COPY packages/shared/package.json packages/shared/
+COPY apps/api/package.json apps/api/
+COPY apps/miniapp/package.json apps/miniapp/
+COPY apps/bot/package.json apps/bot/
+RUN npm install
+
+# Sources.
+COPY tsconfig.base.json ./
+COPY packages ./packages
+COPY apps/api ./apps/api
+COPY apps/miniapp ./apps/miniapp
+
+RUN npm run generate --workspace @jet/db
+# Build the Mini App with no VITE_API_URL => relative /api (same origin).
+RUN npm run build --workspace @jet/miniapp
+
+ENV NODE_ENV=production
+ENV MINIAPP_DIST=/app/apps/miniapp/dist
+EXPOSE 3000
+CMD ["npm", "run", "start", "--workspace", "@jet/api"]

@@ -36,6 +36,10 @@ export const env = {
 
   healthModuleEnabled: optional('HEALTH_MODULE_ENABLED', 'false') === 'true',
   platformFeePercent: Number(optional('PLATFORM_FEE_PERCENT', '10')),
+
+  // If set, the API also serves the built Mini App static files from this
+  // directory (single-origin mode — used by the Cloudflare tunnel demo stack).
+  miniappDist: process.env.MINIAPP_DIST ?? '',
 } as const;
 
 export type Env = typeof env;

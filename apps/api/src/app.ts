@@ -1,8 +1,11 @@
 // Build the Fastify app. Kept separate from index.ts so tests can import it.
 
+import { existsSync } from 'node:fs';
+import { join, isAbsolute, resolve } from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 import authPlugin from './auth/authPlugin.js';
 import { healthRoutes } from './routes/health.js';
 import { authRoutes } from './routes/auth.js';
@@ -26,8 +29,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     trustProxy: true,
   });
 
+  const allowAllOrigins = env.corsOrigins.includes('*') || env.corsOrigins.length === 0;
   await app.register(cors, {
-    origin: env.corsOrigins.length > 0 ? env.corsOrigins : true,
+    origin: allowAllOrigins ? true : env.corsOrigins,
     credentials: true,
   });
 
@@ -43,5 +47,37 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(healthRoutes);
   await app.register(authRoutes, { prefix: '/api' });
 
+  // Optional single-origin mode: also serve the built Mini App static files.
+  await registerStatic(app);
+
   return app;
+}
+
+/**
+ * When MINIAPP_DIST points at a built Mini App, serve it from the API origin.
+ * Non-API GET routes fall back to index.html (SPA), so the frontend and API
+ * share one public URL (used by the Cloudflare tunnel demo stack).
+ */
+async function registerStatic(app: FastifyInstance): Promise<void> {
+  if (!env.miniappDist) return;
+  const root = isAbsolute(env.miniappDist)
+    ? env.miniappDist
+    : resolve(process.cwd(), env.miniappDist);
+  if (!existsSync(join(root, 'index.html'))) {
+    app.log.warn(`MINIAPP_DIST set but no index.html at ${root}; skipping static serving`);
+    return;
+  }
+
+  await app.register(fastifyStatic, { root, wildcard: false });
+
+  // SPA fallback: unmatched GETs that aren't API/health return the app shell.
+  app.setNotFoundHandler((request, reply) => {
+    const url = request.raw.url ?? '';
+    if (request.method === 'GET' && !url.startsWith('/api') && !url.startsWith('/health')) {
+      return reply.sendFile('index.html');
+    }
+    return reply.code(404).send({ error: 'not_found' });
+  });
+
+  app.log.info(`serving Mini App static from ${root}`);
 }

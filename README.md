@@ -85,6 +85,33 @@ npm run dev:miniapp       # http://localhost:5173
 docker compose up --build
 ```
 
+## Быстрый временный URL (Cloudflare tunnel) — увидеть в Telegram без домена
+
+Самый быстрый способ открыть Mini App прямо в Telegram, **без домена и без
+хостинга**. API отдаёт и фронтенд, и `/api` с одного адреса; бот работает в
+режиме long-polling (публичный URL ему не нужен); Cloudflare выдаёт временный
+`https://<случайно>.trycloudflare.com`.
+
+```bash
+# 1. .env — достаточно BOT_TOKEN
+cp .env.example .env && $EDITOR .env   # вписать BOT_TOKEN
+
+# 2. Поднять стек (миграции применятся сами)
+docker compose -f docker-compose.tunnel.yml up --build
+
+# 3. Узнать временный URL
+docker compose -f docker-compose.tunnel.yml logs cloudflared | grep trycloudflare.com
+```
+
+Затем в [@BotFather](https://t.me/BotFather) → Bot Settings → **Menu Button** →
+вставить полученный `https://…trycloudflare.com`. Откройте бота, нажмите кнопку —
+Mini App загрузится с этого адреса.
+
+> URL меняется при каждом перезапуске туннеля, но **пересобирать ничего не
+> нужно**: фронтенд ходит в API по относительным путям `/api/...`, так что
+> достаточно обновить адрес в BotFather. Для стабильного адреса — раздел
+> «Продакшн-деплой» ниже.
+
 ## Продакшн-деплой (VPS + ваш домен)
 
 Стек `docker-compose.prod.yml`: **Traefik** терминирует TLS и сам получает

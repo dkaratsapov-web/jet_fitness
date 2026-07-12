@@ -1,0 +1,105 @@
+# Jet Fitness — TEMPORARY public URL via Cloudflare quick tunnel.
+# No domain, no account, no HTTPS setup — one command, one temporary URL.
+#
+# The API serves BOTH the Mini App and /api from one origin; the bot runs in
+# long-polling mode (no public webhook needed). Cloudflare gives a temporary
+# https://<random>.trycloudflare.com that points at the API.
+#
+# Usage:
+#   1) put BOT_TOKEN in .env
+#   2) docker compose -f docker-compose.tunnel.yml up --build
+#   3) read the URL:
+#        docker compose -f docker-compose.tunnel.yml logs cloudflared | grep trycloudflare.com
+#   4) BotFather: set that URL as the Mini App / Menu Button Web App URL
+#   5) open the bot, tap the button — the Mini App loads from the tunnel URL
+#
+# The URL changes each restart, but because the Mini App uses relative /api
+# paths you do NOT need to rebuild — just update the URL in BotFather.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jet
+      POSTGRES_PASSWORD: jet
+      POSTGRES_DB: jet_fitness
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jet -d jet_fitness"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: apply migrations, then exit.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.allinone
+    environment:
+      DATABASE_URL: postgresql://jet:jet@postgres:5432/jet_fitness?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["npm", "run", "migrate:deploy", "--workspace", "@jet/db"]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.allinone
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://jet:jet@postgres:5432/jet_fitness?schema=public
+      REDIS_URL: redis://redis:6379
+      API_HOST: 0.0.0.0
+      # Same-origin: the Mini App and API share the tunnel URL, so CORS is moot.
+      CORS_ORIGINS: "*"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+
+  bot:
+    build:
+      context: .
+      dockerfile: apps/bot/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://jet:jet@postgres:5432/jet_fitness?schema=public
+      REDIS_URL: redis://redis:6379
+      # No WEBHOOK_URL => long-polling. No public URL required for the bot.
+      # MINIAPP_URL is optional here; the tunnel URL can be set later in BotFather.
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://api:3000
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
