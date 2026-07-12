@@ -26,7 +26,8 @@ rm -rf "$API/pkg" "$API/function.zip"
 mkdir -p "$API/pkg/node_modules/@prisma" "$API/pkg/node_modules/.prisma"
 cp "$API/dist/handler.js" "$API/pkg/"
 # Sourcemap is omitted from the package to keep it small (runtime doesn't need it).
-printf '{"type":"commonjs"}\n' > "$API/pkg/package.json"
+# NOTE: no package.json — Yandex would run npm install and drop the bundled
+# node_modules. Without it the runtime treats handler.js as CommonJS by default.
 cp -r node_modules/@prisma/client "$API/pkg/node_modules/@prisma/client"
 cp -r node_modules/.prisma/client "$API/pkg/node_modules/.prisma/client"
 
@@ -34,3 +35,5 @@ echo "==> Zipping"
 ( cd "$API/pkg" && zip -qr "../function.zip" . )
 
 echo "==> Done: $API/function.zip ($(du -h "$API/function.zip" | cut -f1))"
+echo "==> Package sanity (must list @prisma/client + engine):"
+unzip -l "$API/function.zip" | grep -E "handler.js|@prisma/client/index.js|libquery_engine" || echo "!! MISSING expected files"
