@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+apps/miniapp/dist/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Prisma
+packages/db/prisma/*.db
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Docker volumes (if bind-mounted locally)
+.data/
+
+# Test / coverage
+coverage/

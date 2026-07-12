@@ -1,0 +1,28 @@
+{
+  "name": "jet-fitness",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Telegram-native fitness coaching platform (Bot + Mini App) — coach <-> clients",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev:api": "npm run dev --workspace @jet/api",
+    "dev:bot": "npm run dev --workspace @jet/bot",
+    "dev:miniapp": "npm run dev --workspace @jet/miniapp",
+    "db:generate": "npm run generate --workspace @jet/db",
+    "db:migrate": "npm run migrate:dev --workspace @jet/db",
+    "db:deploy": "npm run migrate:deploy --workspace @jet/db",
+    "db:studio": "npm run studio --workspace @jet/db",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

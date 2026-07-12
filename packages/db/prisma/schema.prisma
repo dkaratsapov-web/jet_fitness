@@ -1,0 +1,542 @@
+// Jet Fitness — Prisma schema (spec §5)
+// Telegram-native fitness coaching platform. One Telegram account may act as
+// both coach and client; role is determined by login context, not hard-wired.
+//
+// Modules are grouped by domain. Health-module models (LabResult, Supplement*)
+// exist in the schema but the feature is gated behind HEALTH_MODULE_ENABLED
+// (spec §10) and is only wired up in Phase 3.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  client
+  coach
+  admin
+}
+
+enum CoachClientStatus {
+  pending
+  active
+  paused
+  ended
+}
+
+enum ClientStatus {
+  active
+  paused
+  ended
+}
+
+enum Sex {
+  male
+  female
+  other
+}
+
+enum MealType {
+  breakfast
+  lunch
+  dinner
+  snack
+}
+
+enum ProgressPhotoType {
+  front
+  side
+  back
+}
+
+enum SupplementCreator {
+  self
+  coach
+}
+
+enum SubscriptionStatus {
+  active
+  past_due
+  canceled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum ChallengeType {
+  steps
+  workouts
+  weight
+  custom
+}
+
+// ─────────────────────────────────────────────────────────────
+// Identity & roles
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id         String   @id @default(cuid())
+  telegramId BigInt   @unique
+  username   String?
+  firstName  String?
+  timezone   String   @default("UTC")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  coachProfile  CoachProfile?
+  clientProfile ClientProfile?
+
+  // Relationships this user participates in, from either side.
+  asCoachOf CoachClient[] @relation("CoachClientCoach")
+  asClientOf CoachClient[] @relation("CoachClientClient")
+
+  invitesCreated CoachInvite[] @relation("CoachInviteCoach")
+  notifications  Notification[]
+
+  @@index([username])
+}
+
+model CoachProfile {
+  id             String  @id @default(cuid())
+  userId         String  @unique
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio            String?
+  specialization String?
+  publicSlug     String? @unique
+  branding       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ClientProfile {
+  id        String        @id @default(cuid())
+  userId    String        @unique
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sex       Sex?
+  birthDate DateTime?
+  heightCm  Float?
+  goal      String?
+  status    ClientStatus  @default(active)
+  // Explicit consent for health-data processing (spec §10). Gates the health module per-user.
+  healthConsentAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Links a coach to a client (both are Users). A coach has many clients; a
+// client may have (historically) more than one coach relationship.
+model CoachClient {
+  id        String            @id @default(cuid())
+  coachId   String
+  coach     User              @relation("CoachClientCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  clientId  String
+  client    User              @relation("CoachClientClient", fields: [clientId], references: [id], onDelete: Cascade)
+  status    CoachClientStatus @default(pending)
+  startedAt DateTime?
+  endedAt   DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([coachId, clientId])
+  @@index([clientId])
+}
+
+// One-time, TTL-bound deep-link invite token (t.me/<bot>?start=invite_<token>).
+model CoachInvite {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  coachId   String
+  coach     User      @relation("CoachInviteCoach", fields: [coachId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  usedById  String?
+  createdAt DateTime  @default(now())
+
+  @@index([coachId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Training: exercises, programs, assignments, logs
+// ─────────────────────────────────────────────────────────────
+
+model Exercise {
+  id            String  @id @default(cuid())
+  // Null owner => global/library exercise available to everyone.
+  ownerCoachId  String?
+  name          String
+  muscleGroup   String?
+  videoUrl      String?
+  instructions  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  programExercises ProgramExercise[]
+  formVideos       FormVideo[]
+
+  @@index([ownerCoachId])
+  @@index([muscleGroup])
+}
+
+model Program {
+  id          String  @id @default(cuid())
+  coachId     String
+  name        String
+  description String?
+  isTemplate  Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  days        ProgramDay[]
+  assignments Assignment[]
+
+  @@index([coachId])
+}
+
+model ProgramDay {
+  id        String @id @default(cuid())
+  programId String
+  program   Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  order     Int
+  title     String?
+
+  exercises ProgramExercise[]
+
+  @@index([programId])
+}
+
+model ProgramExercise {
+  id           String  @id @default(cuid())
+  programDayId String
+  programDay   ProgramDay @relation(fields: [programDayId], references: [id], onDelete: Cascade)
+  exerciseId   String
+  exercise     Exercise   @relation(fields: [exerciseId], references: [id])
+  order        Int
+  sets         Int?
+  reps         String?    // e.g. "8-12" or "AMRAP"
+  weight       String?    // e.g. "70kg" or "bodyweight"
+  restSec      Int?
+  tempo        String?    // e.g. "3-1-1"
+  notes        String?
+
+  setLogs WorkoutSetLog[]
+
+  @@index([programDayId])
+  @@index([exerciseId])
+}
+
+// A program handed to a specific client.
+model Assignment {
+  id        String   @id @default(cuid())
+  programId String
+  program   Program  @relation(fields: [programId], references: [id])
+  clientId  String
+  startDate DateTime @default(now())
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  workoutLogs WorkoutLog[]
+
+  @@index([clientId])
+  @@index([programId])
+}
+
+model WorkoutLog {
+  id           String    @id @default(cuid())
+  clientId     String
+  assignmentId String?
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id])
+  date         DateTime
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  setLogs WorkoutSetLog[]
+
+  @@index([clientId, date])
+  @@index([assignmentId])
+}
+
+model WorkoutSetLog {
+  id                String  @id @default(cuid())
+  workoutLogId      String
+  workoutLog        WorkoutLog @relation(fields: [workoutLogId], references: [id], onDelete: Cascade)
+  programExerciseId String
+  programExercise   ProgramExercise @relation(fields: [programExerciseId], references: [id])
+  setNumber         Int
+  actualReps        Int?
+  actualWeight      Float?
+  rpe               Float?
+
+  @@index([workoutLogId])
+  @@index([programExerciseId])
+}
+
+// Client-uploaded technique video, coach comments in context.
+model FormVideo {
+  id         String   @id @default(cuid())
+  clientId   String
+  exerciseId String?
+  exercise   Exercise? @relation(fields: [exerciseId], references: [id])
+  videoUrl   String
+  createdAt  DateTime @default(now())
+
+  comments FormVideoComment[]
+
+  @@index([clientId])
+  @@index([exerciseId])
+}
+
+model FormVideoComment {
+  id          String   @id @default(cuid())
+  formVideoId String
+  formVideo   FormVideo @relation(fields: [formVideoId], references: [id], onDelete: Cascade)
+  coachId     String
+  body        String
+  createdAt   DateTime @default(now())
+
+  @@index([formVideoId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Nutrition
+// ─────────────────────────────────────────────────────────────
+
+model FoodItem {
+  id         String  @id @default(cuid())
+  source     String  // e.g. "openfoodfacts"
+  externalId String?
+  name       String
+  per100     Json    // { kcal, protein, fat, carbs }
+  barcode    String?
+  createdAt  DateTime @default(now())
+
+  mealLogs MealLog[]
+
+  @@unique([source, externalId])
+  @@index([barcode])
+  @@index([name])
+}
+
+model NutritionTarget {
+  id         String   @id @default(cuid())
+  clientId   String
+  kcal       Int
+  protein    Int
+  fat        Int
+  carbs      Int
+  activeFrom DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([clientId, activeFrom])
+}
+
+model MealLog {
+  id         String   @id @default(cuid())
+  clientId   String
+  date       DateTime
+  mealType   MealType
+  foodItemId String?
+  foodItem   FoodItem? @relation(fields: [foodItemId], references: [id])
+  grams      Float
+  // Macros denormalized at log time — the food DB may change later (spec §5 note).
+  kcal       Float
+  protein    Float
+  fat        Float
+  carbs      Float
+  createdAt  DateTime @default(now())
+
+  @@index([clientId, date])
+  @@index([foodItemId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Progress
+// ─────────────────────────────────────────────────────────────
+
+model ProgressEntry {
+  id           String   @id @default(cuid())
+  clientId     String
+  date         DateTime
+  weightKg     Float?
+  bodyFatPct   Float?
+  measurements Json?    // { chest, waist, hips, arm, ... } cm
+  createdAt    DateTime @default(now())
+
+  @@index([clientId, date])
+}
+
+model ProgressPhoto {
+  id        String            @id @default(cuid())
+  clientId  String
+  date      DateTime
+  type      ProgressPhotoType
+  fileKey   String            // S3/MinIO object key
+  createdAt DateTime          @default(now())
+
+  @@index([clientId, date])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Health module (spec §6.6 / §7.6 / §7.7 / §10) — SENSITIVE.
+// Gated behind HEALTH_MODULE_ENABLED. Sensitive fields/files are
+// encrypted at rest; access strictly limited to client + their coach.
+// ─────────────────────────────────────────────────────────────
+
+// SENSITIVE medical data (spec §10). Encrypt value/sourceFile at rest.
+model LabResult {
+  id            String   @id @default(cuid())
+  clientId      String
+  date          DateTime
+  marker        String
+  value         Float
+  unit          String?
+  refLow        Float?
+  refHigh       Float?
+  sourceFileKey String?  // S3/MinIO object key for the scanned form
+  createdAt     DateTime @default(now())
+
+  @@index([clientId, date])
+  @@index([marker])
+}
+
+// Neutral self-log only (spec §7.7 / §10). No dosing/prescription workflows.
+model SupplementLog {
+  id          String            @id @default(cuid())
+  clientId    String
+  name        String
+  dose        String?
+  schedule    Json?             // { times: ["08:00","20:00"], days: [...] }
+  createdBy   SupplementCreator @default(self)
+  remindersOn Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+
+  intakes SupplementIntake[]
+
+  @@index([clientId])
+}
+
+model SupplementIntake {
+  id              String   @id @default(cuid())
+  supplementLogId String
+  supplementLog   SupplementLog @relation(fields: [supplementLogId], references: [id], onDelete: Cascade)
+  takenAt         DateTime @default(now())
+
+  @@index([supplementLogId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Payments & subscriptions
+// ─────────────────────────────────────────────────────────────
+
+model Subscription {
+  id               String             @id @default(cuid())
+  coachId          String
+  clientId         String
+  planName         String
+  amount           Int                // minor units (e.g. kopecks/cents)
+  currency         String
+  periodDays       Int
+  status           SubscriptionStatus @default(active)
+  currentPeriodEnd DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  payments Payment[]
+
+  @@index([coachId])
+  @@index([clientId])
+  @@index([status])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  coachId        String
+  clientId       String
+  amount         Int           // minor units
+  currency       String
+  status         PaymentStatus @default(pending)
+  provider       String
+  // Provider reference — used for idempotency of money operations (spec §11).
+  providerRef    String?       @unique
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([subscriptionId])
+  @@index([coachId])
+  @@index([clientId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Check-ins & challenges
+// ─────────────────────────────────────────────────────────────
+
+model CheckIn {
+  id          String   @id @default(cuid())
+  clientId    String
+  date        DateTime
+  mood        Int?
+  adherencePct Int?
+  energy      Int?
+  notes       String?
+  photoKeys   Json?    // string[] of S3/MinIO object keys
+  createdAt   DateTime @default(now())
+
+  @@index([clientId, date])
+}
+
+model Challenge {
+  id        String        @id @default(cuid())
+  coachId   String
+  name      String
+  type      ChallengeType
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime      @default(now())
+
+  participants ChallengeParticipant[]
+
+  @@index([coachId])
+}
+
+model ChallengeParticipant {
+  id          String    @id @default(cuid())
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  clientId    String
+  score       Float     @default(0)
+
+  @@unique([challengeId, clientId])
+  @@index([clientId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id      String    @id @default(cuid())
+  userId  String
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    String
+  payload Json?
+  sentAt  DateTime?
+  readAt  DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
