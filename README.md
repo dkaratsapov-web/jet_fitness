@@ -85,6 +85,45 @@ npm run dev:miniapp       # http://localhost:5173
 docker compose up --build
 ```
 
+## Продакшн-деплой (VPS + ваш домен)
+
+Стек `docker-compose.prod.yml`: **Traefik** терминирует TLS и сам получает
+сертификаты Let's Encrypt. Mini App отдаётся статикой из nginx, API и вебхук
+бота — за реверс-прокси. Нужны два поддомена вашего домена.
+
+**1. DNS.** Направьте A/AAAA-записи на IP вашего VPS:
+
+| Поддомен | Назначение |
+|---|---|
+| `app.<ваш-домен>` | Mini App (фронтенд) |
+| `api.<ваш-домен>` | REST API + вебхук бота (`/telegram/webhook`) |
+
+**2. `.env`** на сервере (из `.env.example`), минимум:
+
+```env
+BOT_TOKEN=<от BotFather>
+APP_DOMAIN=app.вашдомен.ру
+API_DOMAIN=api.вашдомен.ру
+ACME_EMAIL=you@вашдомен.ру
+POSTGRES_PASSWORD=<надёжный пароль>
+```
+
+`WEBHOOK_URL`, `MINIAPP_URL`, `VITE_API_URL` и `CORS_ORIGINS` стек выводит из
+`APP_DOMAIN`/`API_DOMAIN` автоматически — вручную задавать не нужно.
+
+**3. Запуск** (миграции применяются автоматически перед стартом api/bot):
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+**4. BotFather.** Укажите Mini App URL = `https://app.<ваш-домен>`
+(`/newapp` или Bot Settings → Menu Button → Web App URL). Вебхук бот ставит сам
+при старте (`WEBHOOK_URL`).
+
+После этого бот открывает Mini App по кнопке, а Telegram грузит фронтенд с
+`https://app.<ваш-домен>` и ходит в API на `https://api.<ваш-домен>`.
+
 ## Скрипты
 
 | Команда | Действие |
@@ -127,15 +166,12 @@ App. API (`/api/auth/session`) дополнительно обрабатывае
 
 ## Что нужно от заказчика перед запуском
 
-Заполнить в `.env`:
-
 - **`BOT_TOKEN`** — от [@BotFather](https://t.me/BotFather). **Обязательно** —
   без него не стартуют ни бот, ни API (нужен для валидации `initData`).
-- **`MINIAPP_URL`** — публичный HTTPS-URL Mini App (для кнопки запуска и
-  webhook). Для локали можно временно оставить пустым.
-- **`WEBHOOK_URL`** — HTTPS-эндпоинт webhook бота (для прод; локально — пусто,
-  тогда long-polling).
+- **Домен + VPS** — для прод: два поддомена (`app.` и `api.`) на IP сервера
+  (см. «Продакшн-деплой»). HTTPS Traefik делает сам.
 - Позже (Фаза 1+): `PAYMENT_PROVIDER_TOKEN` (напр. ЮKassa), настройки S3.
 
-Остальные переменные имеют рабочие значения по умолчанию для локальной
-разработки — см. `.env.example`.
+Mini App URL (`MINIAPP_URL`), webhook (`WEBHOOK_URL`) и `VITE_API_URL` в
+прод-стеке выводятся из `APP_DOMAIN`/`API_DOMAIN` автоматически. Остальные
+переменные имеют рабочие дефолты для локальной разработки — см. `.env.example`.
