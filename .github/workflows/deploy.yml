@@ -70,13 +70,13 @@ jobs:
             BOT_TOKEN=${{ secrets.BOT_TOKEN }}
             BOT_WEBHOOK_SECRET=${{ secrets.BOT_WEBHOOK_SECRET }}
             DATABASE_URL=${{ secrets.DATABASE_URL }}
-            TELEGRAM_API_ROOT=${{ secrets.TELEGRAM_API_ROOT }}
             INITDATA_TTL_SECONDS=86400
             HEALTH_MODULE_ENABLED=false
             S3_ENDPOINT=https://storage.yandexcloud.net
             S3_BUCKET=${{ secrets.S3_UPLOADS_BUCKET }}
             S3_KEY=${{ secrets.S3_KEY }}
             S3_SECRET=${{ secrets.S3_SECRET }}
+            ${{ secrets.TELEGRAM_API_ROOT != '' && format('TELEGRAM_API_ROOT={0}', secrets.TELEGRAM_API_ROOT) || '' }}
 
       # ── 3. Mini App static -> Object Storage ────────────────
       - name: Build Mini App
