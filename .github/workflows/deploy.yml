@@ -40,8 +40,12 @@ jobs:
         run: npm ci
 
       # ── 1. Database schema ──────────────────────────────────
+      # Prisma's schema engine needs a DIRECT (session) connection, so use the
+      # PostgreSQL port 5432 instead of the transaction pooler on 6432.
       - name: Push DB schema
-        run: npm run push --workspace @jet/db
+        run: |
+          DIRECT_URL="$(printf '%s' "$DATABASE_URL" | sed 's/:6432/:5432/')"
+          DATABASE_URL="$DIRECT_URL" npm run push --workspace @jet/db
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -67,7 +71,7 @@ jobs:
             ENABLE_TELEGRAM_WEBHOOK=${{ secrets.TELEGRAM_API_ROOT != '' }}
             BOT_TOKEN=${{ secrets.BOT_TOKEN }}
             BOT_WEBHOOK_SECRET=${{ secrets.BOT_WEBHOOK_SECRET }}
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}&pgbouncer=true
             TELEGRAM_API_ROOT=${{ secrets.TELEGRAM_API_ROOT }}
             INITDATA_TTL_SECONDS=86400
             HEALTH_MODULE_ENABLED=false
