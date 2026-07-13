@@ -103,6 +103,7 @@ jobs:
             --environment "INITDATA_TTL_SECONDS=86400" \
             --environment "HEALTH_MODULE_ENABLED=false" \
             --environment "OWNER_TELEGRAM_IDS=169920903" \
+            --environment "MINIAPP_URL=https://storage.yandexcloud.net/jet-fitness-app/index.html" \
             --environment "S3_ENDPOINT=https://storage.yandexcloud.net" \
             --environment "S3_BUCKET=$S3_UPLOADS_BUCKET" \
             --environment "S3_KEY=$S3_KEY" \
