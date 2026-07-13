@@ -205,6 +205,11 @@ jobs:
           curl -fsSL --max-time 30 \
             "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260713_220341_65918d8c-f4e0-4486-b1a8-df21cc2b34a2.png" \
             -o apps/miniapp/public/brand/app-bg.png && echo "background fetched" || echo "background fetch skipped"
+          # Approved exercise demo video(s), hosted on our own storage.
+          mkdir -p apps/miniapp/public/exercises
+          curl -fsSL --max-time 60 \
+            "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260713_220446_5d77ba80-294d-4a2c-9b7e-5f568b93007e.mp4" \
+            -o apps/miniapp/public/exercises/biceps-curl.mp4 && echo "biceps video fetched" || echo "biceps video skipped"
 
       - name: Build Mini App
         run: npm run build --workspace @jet/miniapp

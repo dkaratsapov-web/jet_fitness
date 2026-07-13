@@ -21,7 +21,25 @@ const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm', 'm4v']);
 // Sync the global exercise library (spec §7.2): create missing entries and
 // update existing ones with technique / recommendations / precautions. Runs
 // lazily; a version marker (first item having `technique`) short-circuits it.
+// Approved demo videos hosted on our own storage, keyed by exercise name.
+// Applied on every library sync (even after the initial seed) so a newly
+// approved clip attaches to an already-seeded exercise.
+const VIDEO_OVERRIDES: Record<string, string> = {
+  'Подъём на бицепс':
+    'https://storage.yandexcloud.net/jet-fitness-app/exercises/biceps-curl.mp4',
+};
+
+async function applyVideoOverrides(): Promise<void> {
+  for (const [name, videoUrl] of Object.entries(VIDEO_OVERRIDES)) {
+    await prisma.exercise.updateMany({
+      where: { ownerCoachId: null, name, NOT: { videoUrl } },
+      data: { videoUrl },
+    });
+  }
+}
+
 async function ensureStarterLibrary(): Promise<void> {
+  await applyVideoOverrides();
   const first = EXERCISE_LIBRARY[0];
   const marker = await prisma.exercise.findFirst({
     where: { ownerCoachId: null, name: first.name },
