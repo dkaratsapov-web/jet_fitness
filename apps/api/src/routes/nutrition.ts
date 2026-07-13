@@ -18,7 +18,6 @@ import {
   searchOpenFoodFacts,
   lookupBarcode,
   type Macros,
-  type FoodHit,
 } from '../nutritionSources.js';
 import { searchFatSecret, isFatSecretConfigured } from '../nutrition/fatsecret.js';
 
@@ -230,35 +229,24 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
       const q = (request.query.q ?? '').trim();
       if (q.length < 2) return { foods: [] };
 
-      // Local cache first (instant, offline-friendly).
-      const local = await prisma.foodItem.findMany({
-        where: { name: { contains: q, mode: 'insensitive' } },
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-      });
-      const foods = local.map((f) => ({
-        id: f.id,
-        name: f.name,
-        barcode: f.barcode,
-        per100: f.per100 as unknown as Macros,
-      }));
+      const foods: Array<{ id: string; name: string; barcode: string | null; per100: Macros }> = [];
+      const seenNames = new Set<string>();
+      const pushFood = (f: { id: string; name: string; barcode: string | null; per100: Macros }) => {
+        const key = f.name.trim().toLowerCase();
+        if (foods.length >= 15 || foods.some((x) => x.id === f.id) || seenNames.has(key)) return;
+        seenNames.add(key);
+        foods.push(f);
+      };
 
-      // Remote providers (best-effort; cache new hits). Prefer FatSecret when
-      // configured — its data is richer — then fall back to Open Food Facts.
-      const providers: Array<{ source: string; hits: FoodHit[] }> = [];
+      // FatSecret first when configured — its data is richer. Cache new hits.
       if (isFatSecretConfigured()) {
-        providers.push({ source: 'fatsecret', hits: await searchFatSecret(q) });
-      }
-      providers.push({ source: 'openfoodfacts', hits: await searchOpenFoodFacts(q) });
-
-      for (const provider of providers) {
-        for (const r of provider.hits) {
+        for (const r of await searchFatSecret(q)) {
           if (foods.length >= 15) break;
           const saved = await prisma.foodItem.upsert({
-            where: { source_externalId: { source: provider.source, externalId: r.externalId } },
+            where: { source_externalId: { source: 'fatsecret', externalId: r.externalId } },
             update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },
             create: {
-              source: provider.source,
+              source: 'fatsecret',
               externalId: r.externalId,
               name: r.name,
               per100: r.per100 as object,
@@ -266,14 +254,35 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
             },
             select: { id: true, name: true, barcode: true, per100: true },
           });
-          if (!foods.some((f) => f.id === saved.id)) {
-            foods.push({
-              id: saved.id,
-              name: saved.name,
-              barcode: saved.barcode,
-              per100: saved.per100 as unknown as Macros,
-            });
-          }
+          pushFood({ ...saved, per100: saved.per100 as unknown as Macros });
+        }
+      }
+
+      // Then the local cache (instant, offline-friendly).
+      const local = await prisma.foodItem.findMany({
+        where: { name: { contains: q, mode: 'insensitive' } },
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+      });
+      for (const f of local) pushFood({ ...f, per100: f.per100 as unknown as Macros });
+
+      // Finally Open Food Facts to fill any remaining slots.
+      if (foods.length < 15) {
+        for (const r of await searchOpenFoodFacts(q)) {
+          if (foods.length >= 15) break;
+          const saved = await prisma.foodItem.upsert({
+            where: { source_externalId: { source: 'openfoodfacts', externalId: r.externalId } },
+            update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },
+            create: {
+              source: 'openfoodfacts',
+              externalId: r.externalId,
+              name: r.name,
+              per100: r.per100 as object,
+              barcode: r.barcode,
+            },
+            select: { id: true, name: true, barcode: true, per100: true },
+          });
+          pushFood({ ...saved, per100: saved.per100 as unknown as Macros });
         }
       }
       return { foods };

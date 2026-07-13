@@ -145,28 +145,42 @@ jobs:
             echo "function runtime SA: $FUNC_SA_ID"
           fi
 
-          yc serverless function version create \
-            --function-name jet-fitness-api \
-            --runtime nodejs18 \
-            --entrypoint handler.handler \
-            --memory 512m \
-            --execution-timeout 60s \
-            "${SA_ARGS[@]}" \
-            --package-bucket-name "$S3_UPLOADS_BUCKET" \
-            --package-object-name "deploy/function.zip" \
-            --environment "NODE_ENV=production" \
-            --environment "BOT_TOKEN=$BOT_TOKEN" \
-            --environment "BOT_WEBHOOK_SECRET=$BOT_WEBHOOK_SECRET" \
-            --environment "DATABASE_URL=$DATABASE_URL" \
-            --environment "INITDATA_TTL_SECONDS=86400" \
-            --environment "OWNER_TELEGRAM_IDS=169920903" \
-            --environment "MINIAPP_URL=https://storage.yandexcloud.net/jet-fitness-app/index.html" \
-            --environment "BOT_USERNAME=coach_pro_bot" \
-            --environment "S3_ENDPOINT=https://storage.yandexcloud.net" \
-            --environment "S3_BUCKET=$S3_UPLOADS_BUCKET" \
-            --environment "S3_KEY=$S3_KEY" \
-            --environment "S3_SECRET=$S3_SECRET" \
-            "${EXTRA[@]}"
+          CREATE_ARGS=(
+            --function-name jet-fitness-api
+            --runtime nodejs18
+            --entrypoint handler.handler
+            --memory 512m
+            --execution-timeout 60s
+            --package-bucket-name "$S3_UPLOADS_BUCKET"
+            --package-object-name "deploy/function.zip"
+            --environment "NODE_ENV=production"
+            --environment "BOT_TOKEN=$BOT_TOKEN"
+            --environment "BOT_WEBHOOK_SECRET=$BOT_WEBHOOK_SECRET"
+            --environment "DATABASE_URL=$DATABASE_URL"
+            --environment "INITDATA_TTL_SECONDS=86400"
+            --environment "OWNER_TELEGRAM_IDS=169920903"
+            --environment "MINIAPP_URL=https://storage.yandexcloud.net/jet-fitness-app/index.html"
+            --environment "BOT_USERNAME=coach_pro_bot"
+            --environment "S3_ENDPOINT=https://storage.yandexcloud.net"
+            --environment "S3_BUCKET=$S3_UPLOADS_BUCKET"
+            --environment "S3_KEY=$S3_KEY"
+            --environment "S3_SECRET=$S3_SECRET"
+          )
+          CREATE_ARGS+=("${EXTRA[@]}")
+
+          # Try with the runtime SA; if assigning it is not permitted
+          # (iam.serviceAccounts.user missing), fall back to deploying without
+          # it so the release never breaks. OCR activates once the role exists.
+          set +e
+          yc serverless function version create "${CREATE_ARGS[@]}" "${SA_ARGS[@]}"
+          rc=$?
+          if [ $rc -ne 0 ] && [ ${#SA_ARGS[@]} -gt 0 ]; then
+            echo "::warning::Runtime SA assignment failed — deploying without it. Grant iam.serviceAccounts.user to the SA to enable lab OCR."
+            yc serverless function version create "${CREATE_ARGS[@]}"
+            rc=$?
+          fi
+          set -e
+          [ $rc -eq 0 ]
 
       # Self-check: hit the deployed API from the runner (which can reach Yandex).
       - name: Smoke test API
