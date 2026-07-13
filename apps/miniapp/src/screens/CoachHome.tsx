@@ -10,6 +10,7 @@ import {
   type Checkin,
   type ProgressPhoto,
   type FormVideo,
+  type NutritionDay,
 } from '../api';
 import { CoachPrograms } from './CoachPrograms';
 import { CoachPayments } from './CoachPayments';
@@ -271,6 +272,8 @@ function ClientRow({ client }: { client: CoachClient }) {
             </div>
           )}
 
+          <CoachClientNutrition clientId={client.id} />
+
           <div className="text-tg-hint text-xs font-medium">Тренировки</div>
           {workouts === null ? (
             <p className="text-tg-hint text-xs">Загрузка…</p>
@@ -327,6 +330,115 @@ function ClientRow({ client }: { client: CoachClient }) {
         </div>
       )}
     </li>
+  );
+}
+
+// Coach view of a client's nutrition: today's totals vs target + set target.
+function CoachClientNutrition({ clientId }: { clientId: string }) {
+  const [day, setDay] = useState<NutritionDay | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [kcal, setKcal] = useState('');
+  const [protein, setProtein] = useState('');
+  const [fat, setFat] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    api
+      .coachClientNutritionDay(clientId)
+      .then((d) => {
+        setDay(d);
+        if (d.target) {
+          setKcal(String(d.target.kcal));
+          setProtein(String(d.target.protein));
+          setFat(String(d.target.fat));
+          setCarbs(String(d.target.carbs));
+        }
+      })
+      .catch(() => setDay(null));
+  }
+  useEffect(load, [clientId]);
+
+  async function saveTarget() {
+    if (!kcal || Number(kcal) <= 0) return;
+    setBusy(true);
+    try {
+      await api.setNutritionTarget(clientId, {
+        kcal: Number(kcal),
+        protein: Number(protein) || 0,
+        fat: Number(fat) || 0,
+        carbs: Number(carbs) || 0,
+      });
+      setEditing(false);
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const t = day?.totals;
+  const goal = day?.target;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-tg-hint text-xs font-medium">Питание (сегодня)</span>
+        <button className="text-tg-link text-xs" onClick={() => setEditing((v) => !v)}>
+          {goal ? 'Изменить цель' : 'Задать цель'}
+        </button>
+      </div>
+
+      {t && (
+        <div className="text-sm">
+          {t.kcal}
+          {goal ? ` / ${goal.kcal}` : ''} ккал
+          <span className="text-tg-hint">
+            {' '}
+            · Б{t.protein} Ж{t.fat} У{t.carbs}
+          </span>
+        </div>
+      )}
+
+      {editing && (
+        <div className="rounded-xl bg-tg-bg p-2 flex flex-col gap-2">
+          <div className="grid grid-cols-4 gap-1">
+            <MiniField label="Ккал" value={kcal} onChange={setKcal} />
+            <MiniField label="Б" value={protein} onChange={setProtein} />
+            <MiniField label="Ж" value={fat} onChange={setFat} />
+            <MiniField label="У" value={carbs} onChange={setCarbs} />
+          </div>
+          <button
+            className="rounded-lg bg-tg-button text-tg-buttonText py-2 text-sm disabled:opacity-60"
+            onClick={saveTarget}
+            disabled={busy}
+          >
+            {busy ? '…' : 'Сохранить цель'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-0.5">
+      <span className="text-tg-hint text-[10px] text-center">{label}</span>
+      <input
+        className="rounded-md bg-tg-secondaryBg p-1.5 text-sm outline-none w-full text-center"
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
   );
 }
 

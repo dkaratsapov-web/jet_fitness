@@ -175,6 +175,40 @@ export interface ProgressInput {
   measurements?: Record<string, number> | null;
 }
 
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
+export interface Macros {
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+}
+
+export interface NutritionMeal {
+  id: string;
+  mealType: MealType;
+  name: string;
+  grams: number;
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+}
+
+export interface NutritionDay {
+  date: string;
+  target: Macros | null;
+  totals: Macros;
+  meals: NutritionMeal[];
+}
+
+export interface FoodSearchItem {
+  id: string;
+  name: string;
+  barcode: string | null;
+  per100: Macros;
+}
+
 export type Sex = 'male' | 'female' | 'other';
 
 export interface ClientProfile {
@@ -300,6 +334,13 @@ export const api = {
     request<ProgressPhoto[]>(`/api/coach/clients/${clientId}/progress-photos`),
   coachClientVideos: (clientId: string) =>
     request<FormVideo[]>(`/api/coach/clients/${clientId}/form-videos`),
+  coachClientNutritionDay: (clientId: string) =>
+    request<NutritionDay>(`/api/coach/clients/${clientId}/nutrition/day`),
+  setNutritionTarget: (clientId: string, body: Macros) =>
+    request<{ ok: boolean }>(`/api/coach/clients/${clientId}/nutrition-target`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   commentVideo: (videoId: string, body: string) =>
     request<{ ok: boolean }>(`/api/coach/form-videos/${videoId}/comments`, {
       method: 'POST',
@@ -335,6 +376,29 @@ export const api = {
       body: JSON.stringify(body),
     }),
   clientVideos: () => request<FormVideo[]>('/api/client/form-videos'),
+
+  // Nutrition (Phase 2)
+  nutritionDay: (date?: string) =>
+    request<NutritionDay>(`/api/client/nutrition/day${date ? `?date=${date}` : ''}`),
+  addMeal: (body: {
+    mealType: MealType;
+    grams: number;
+    name?: string;
+    foodItemId?: string;
+    per100?: Macros;
+  }) =>
+    request<{ ok: boolean; id: string }>('/api/client/nutrition/meals', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteMeal: (id: string) =>
+    request<{ ok: boolean }>(`/api/client/nutrition/meals/${id}`, { method: 'DELETE' }),
+  searchFoods: (q: string) =>
+    request<{ foods: FoodSearchItem[] }>(
+      `/api/client/nutrition/foods/search?q=${encodeURIComponent(q)}`,
+    ),
+  lookupBarcode: (code: string) =>
+    request<{ food: FoodSearchItem }>(`/api/client/nutrition/foods/barcode/${code}`),
   uploadFormVideo: async (file: File) => {
     const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase();
     const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(

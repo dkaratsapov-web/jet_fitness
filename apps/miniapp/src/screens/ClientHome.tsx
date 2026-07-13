@@ -10,6 +10,7 @@ import { WorkoutSession } from './WorkoutSession';
 import { ProgressScreen } from './ProgressScreen';
 import { CheckinScreen } from './CheckinScreen';
 import { TechniqueScreen } from './TechniqueScreen';
+import { NutritionScreen } from './NutritionScreen';
 import { OnboardingForm } from './OnboardingForm';
 import { LineChart } from '../components/LineChart';
 
@@ -19,7 +20,9 @@ export function ClientHome({ session }: { session: SessionResponse }) {
   const [program, setProgram] = useState<ClientProgram | null | undefined>(undefined);
   const [history, setHistory] = useState<WorkoutSummary[]>([]);
   const [active, setActive] = useState<{ day: ClientProgramDay; index: number } | null>(null);
-  const [view, setView] = useState<'home' | 'progress' | 'checkin' | 'technique'>('home');
+  const [view, setView] = useState<
+    'home' | 'progress' | 'checkin' | 'technique' | 'nutrition'
+  >('home');
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   function loadHistory() {
@@ -62,6 +65,10 @@ export function ClientHome({ session }: { session: SessionResponse }) {
 
   if (view === 'technique') {
     return <TechniqueScreen onBack={() => setView('home')} />;
+  }
+
+  if (view === 'nutrition') {
+    return <NutritionScreen onBack={() => setView('home')} />;
   }
 
   return (
@@ -108,10 +115,13 @@ export function ClientHome({ session }: { session: SessionResponse }) {
           <div className="text-base font-medium">Техника</div>
           <div className="text-tg-hint text-xs mt-1">видео-разбор</div>
         </button>
-        <div className="rounded-2xl bg-tg-secondaryBg p-4 text-center opacity-60">
+        <button
+          className="rounded-2xl bg-tg-secondaryBg p-4 text-center"
+          onClick={() => setView('nutrition')}
+        >
           <div className="text-base font-medium">Питание</div>
-          <div className="text-tg-hint text-xs mt-1">скоро</div>
-        </div>
+          <div className="text-tg-hint text-xs mt-1">калории · КБЖУ</div>
+        </button>
       </div>
     </div>
   );
