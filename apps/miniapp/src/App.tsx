@@ -52,6 +52,17 @@ export function App() {
     }
   }
 
+  async function becomeClient() {
+    setBusy(true);
+    try {
+      await api.registerClient();
+      const session = await loadSession(false);
+      if (session) setActiveRole('client');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (state.phase === 'loading') {
     return <Centered>Загрузка…</Centered>;
   }
@@ -91,8 +102,9 @@ export function App() {
           <div>
             <h1 className="text-xl font-semibold mb-2">Добро пожаловать!</h1>
             <p className="text-tg-hint text-sm">
-              Вы тренер? Заведите кабинет и приглашайте клиентов. Клиенты
-              попадают сюда по ссылке-приглашению от своего тренера.
+              Выберите, как хотите начать. Тренер заводит кабинет и приглашает
+              клиентов. Клиент может войти сам, а тренера подключить позже —
+              например по ссылке-приглашению.
             </p>
           </div>
           <button
@@ -102,8 +114,16 @@ export function App() {
           >
             {busy ? 'Создаём кабинет…' : 'Я тренер — создать кабинет'}
           </button>
+          <button
+            className="rounded-2xl bg-tg-secondaryBg p-4 font-medium disabled:opacity-60"
+            onClick={becomeClient}
+            disabled={busy}
+          >
+            {busy ? 'Входим…' : 'Я клиент — войти'}
+          </button>
           <p className="text-tg-hint text-xs">
-            Клиент? Попросите тренера прислать ссылку-приглашение.
+            Получили ссылку-приглашение от тренера? Просто откройте её — вы
+            попадёте сразу к своему тренеру.
           </p>
         </div>
       </Centered>

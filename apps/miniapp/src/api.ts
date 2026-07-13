@@ -82,6 +82,10 @@ export const api = {
   session: () => request<SessionResponse>('/api/auth/session', { method: 'POST' }),
   me: () => request<SessionResponse>('/api/me'),
 
+  // Client (Phase 1) — self sign-up without an invite.
+  registerClient: () =>
+    request<{ ok: boolean }>('/api/client/register', { method: 'POST' }),
+
   // Coach (Phase 1)
   registerCoach: () =>
     request<{ ok: boolean }>('/api/coach/register', { method: 'POST' }),
