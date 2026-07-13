@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api, type ProgramSummary, type CoachClient } from '../api';
 import { ProgramBuilder } from './ProgramBuilder';
+import { ExerciseLibrary } from './ExerciseLibrary';
 
 // Coach programs (Phase 1): list, create (builder), assign to a client.
 export function CoachPrograms() {
   const [programs, setPrograms] = useState<ProgramSummary[] | null>(null);
   const [clients, setClients] = useState<CoachClient[]>([]);
   const [building, setBuilding] = useState(false);
+  const [library, setLibrary] = useState(false);
   const [assignFor, setAssignFor] = useState<ProgramSummary | null>(null);
 
   async function reload() {
@@ -18,6 +20,10 @@ export function CoachPrograms() {
   useEffect(() => {
     reload().catch(() => setPrograms([]));
   }, []);
+
+  if (library) {
+    return <ExerciseLibrary onBack={() => setLibrary(false)} />;
+  }
 
   if (building) {
     return (
@@ -41,12 +47,20 @@ export function CoachPrograms() {
 
   return (
     <div className="flex flex-col gap-4">
-      <button
-        className="rounded-2xl bg-tg-button text-tg-buttonText p-4 font-medium"
-        onClick={() => setBuilding(true)}
-      >
-        ➕ Создать программу
-      </button>
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          className="rounded-2xl bg-tg-button text-tg-buttonText p-4 font-medium"
+          onClick={() => setBuilding(true)}
+        >
+          ➕ Создать программу
+        </button>
+        <button
+          className="rounded-2xl bg-brand-surface brand-line p-4 font-medium text-brand-accent"
+          onClick={() => setLibrary(true)}
+        >
+          🎬 Библиотека
+        </button>
+      </div>
 
       {programs === null ? (
         <p className="text-tg-hint text-sm">Загрузка…</p>

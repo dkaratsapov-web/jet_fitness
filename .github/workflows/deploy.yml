@@ -94,9 +94,11 @@ jobs:
 
           # Health module: only pass the vars when a key is set (yc rejects empty
           # env values). Absent → module stays disabled via app defaults.
+          # Providing the key turns the module ON by default; set the optional
+          # HEALTH_MODULE_ENABLED secret to "false" to keep it dormant.
           if [ -n "${HEALTH_ENCRYPTION_KEY:-}" ]; then
             EXTRA+=(--environment "HEALTH_ENCRYPTION_KEY=$HEALTH_ENCRYPTION_KEY")
-            EXTRA+=(--environment "HEALTH_MODULE_ENABLED=${HEALTH_MODULE_ENABLED:-false}")
+            EXTRA+=(--environment "HEALTH_MODULE_ENABLED=${HEALTH_MODULE_ENABLED:-true}")
           fi
 
           yc serverless function version create \

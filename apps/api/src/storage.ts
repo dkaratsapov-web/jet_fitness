@@ -14,6 +14,18 @@ export function isStorageConfigured(): boolean {
   return Boolean(env.s3.bucket && env.s3.accessKeyId && env.s3.secretAccessKey);
 }
 
+/**
+ * Resolve a stored video reference into a playable URL. External links
+ * (http/https, e.g. a YouTube URL) pass through unchanged; a bare object key
+ * (our own uploads) becomes a short-lived presigned GET URL. Returns null when
+ * there is nothing to show or storage isn't configured for an object key.
+ */
+export function videoViewUrl(ref: string | null | undefined): string | null {
+  if (!ref) return null;
+  if (/^https?:\/\//i.test(ref)) return ref;
+  return isStorageConfigured() ? presign('GET', ref, 3600) : null;
+}
+
 /** RFC3986 encoding (AWS-style). Optionally preserve "/" for path segments. */
 function uriEncode(str: string, keepSlash = false): string {
   let out = '';

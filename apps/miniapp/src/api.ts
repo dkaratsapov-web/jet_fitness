@@ -90,6 +90,7 @@ export interface ExerciseLite {
   name: string;
   muscleGroup: string | null;
   videoUrl?: string | null;
+  hasVideo?: boolean;
   technique?: string | null;
   recommendations?: string | null;
   precautions?: string | null;
@@ -438,6 +439,30 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  // Attach a demonstration video: upload a file to storage, then confirm.
+  uploadExerciseVideo: async (exerciseId: string, file: File) => {
+    const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase();
+    const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(
+      `/api/coach/exercises/${exerciseId}/video/presign`,
+      { method: 'POST', body: JSON.stringify({ ext }) },
+    );
+    const put = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'content-type': file.type || 'application/octet-stream' },
+    });
+    if (!put.ok) throw new Error(`upload failed: ${put.status}`);
+    return request<{ ok: boolean; videoUrl: string | null }>(
+      `/api/coach/exercises/${exerciseId}/video`,
+      { method: 'POST', body: JSON.stringify({ fileKey }) },
+    );
+  },
+  // Attach a demonstration video by external link (e.g. YouTube).
+  setExerciseVideoUrl: (exerciseId: string, videoUrl: string) =>
+    request<{ ok: boolean; videoUrl: string | null }>(
+      `/api/coach/exercises/${exerciseId}/video`,
+      { method: 'POST', body: JSON.stringify({ videoUrl }) },
+    ),
   programs: () => request<ProgramSummary[]>('/api/coach/programs'),
   createProgram: (draft: ProgramDraft) =>
     request<{ id: string; ok: boolean }>('/api/coach/programs', {

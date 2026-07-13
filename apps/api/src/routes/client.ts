@@ -9,7 +9,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { prisma, type ProgressPhotoType, type Sex } from '@jet/db';
 import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
 import { notifyClientsCoaches } from '../notify.js';
-import { presign, isStorageConfigured } from '../storage.js';
+import { presign, isStorageConfigured, videoViewUrl } from '../storage.js';
 
 const PHOTO_TYPES: ProgressPhotoType[] = ['front', 'side', 'back'];
 const PHOTO_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic']);
@@ -136,7 +136,7 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
               id: pe.id,
               name: pe.exercise.name,
               muscleGroup: pe.exercise.muscleGroup,
-              videoUrl: pe.exercise.videoUrl,
+              videoUrl: videoViewUrl(pe.exercise.videoUrl),
               technique: pe.exercise.technique,
               recommendations: pe.exercise.recommendations,
               precautions: pe.exercise.precautions,

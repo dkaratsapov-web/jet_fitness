@@ -8,11 +8,15 @@
 //   DELETE /coach/programs/:id       — delete a program
 //   POST /coach/programs/:id/assign  — hand a program to one of the coach's clients
 
+import { randomBytes } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { requireCoach } from '../auth/guards.js';
 import { notifyUser } from '../notify.js';
+import { presign, isStorageConfigured, videoViewUrl } from '../storage.js';
 import { EXERCISE_LIBRARY } from '../data/exerciseLibrary.js';
+
+const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm', 'm4v']);
 
 // Sync the global exercise library (spec §7.2): create missing entries and
 // update existing ones with technique / recommendations / precautions. Runs
@@ -90,8 +94,78 @@ export const programRoutes: FastifyPluginAsync = async (fastify) => {
         ownerCoachId: true,
       },
     });
-    return exercises.map((e) => ({ ...e, custom: e.ownerCoachId === auth.userId }));
+    return exercises.map((e) => ({
+      ...e,
+      videoUrl: videoViewUrl(e.videoUrl),
+      hasVideo: Boolean(e.videoUrl),
+      custom: e.ownerCoachId === auth.userId,
+    }));
   });
+
+  // ── Attach a demonstration video to an exercise ─────────────────
+  // Two ways: upload a file to Object Storage (presign → confirm) or set an
+  // external link (e.g. YouTube). A coach may enrich their own exercises and
+  // the shared global library.
+  async function canEditExercise(exerciseId: string, coachId: string): Promise<boolean> {
+    const ex = await prisma.exercise.findUnique({
+      where: { id: exerciseId },
+      select: { ownerCoachId: true },
+    });
+    if (!ex) return false;
+    return ex.ownerCoachId === null || ex.ownerCoachId === coachId;
+  }
+
+  fastify.post<{ Params: { id: string }; Body: { ext?: string } }>(
+    '/coach/exercises/:id/video/presign',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      if (!isStorageConfigured()) {
+        reply.code(503).send({ error: 'unavailable', reason: 'storage_not_configured' });
+        return;
+      }
+      if (!(await canEditExercise(request.params.id, auth.userId))) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const ext = (request.body?.ext ?? 'mp4').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!VIDEO_EXTS.has(ext)) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_ext' });
+        return;
+      }
+      const fileKey = `exercises/${request.params.id}/${Date.now()}-${randomBytes(6).toString('hex')}.${ext}`;
+      const uploadUrl = presign('PUT', fileKey, 1800);
+      return { uploadUrl, fileKey };
+    },
+  );
+
+  fastify.post<{ Params: { id: string }; Body: { fileKey?: string; videoUrl?: string } }>(
+    '/coach/exercises/:id/video',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      if (!(await canEditExercise(request.params.id, auth.userId))) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      // Prefer an uploaded object key; otherwise accept a validated external URL.
+      const fileKey = request.body?.fileKey?.trim();
+      const link = request.body?.videoUrl?.trim();
+      let value: string | null = null;
+      if (fileKey && fileKey.startsWith(`exercises/${request.params.id}/`)) {
+        value = fileKey;
+      } else if (link && /^https?:\/\/\S+$/i.test(link)) {
+        value = link;
+      } else {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_video' });
+        return;
+      }
+      await prisma.exercise.update({ where: { id: request.params.id }, data: { videoUrl: value } });
+      return { ok: true, videoUrl: videoViewUrl(value) };
+    },
+  );
 
   fastify.post<{
     Body: {
