@@ -18,6 +18,7 @@ import { CoachPrograms } from './CoachPrograms';
 import { CoachPayments } from './CoachPayments';
 import { CoachChallenges } from './CoachChallenges';
 import { ChatScreen } from '../components/ChatScreen';
+import { LogoMark } from '../components/Logo';
 
 const STATUS_LABEL: Record<CoachClient['status'], string> = {
   pending: 'ожидает',
@@ -55,13 +56,18 @@ export function CoachHome({ session }: { session: SessionResponse }) {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <header>
-        <p className="text-tg-hint text-sm">Кабинет тренера</p>
-        <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
+    <div className="flex flex-col gap-5 p-4">
+      <header className="flex items-center justify-between">
+        <div>
+          <p className="text-brand-accent text-[11px] font-semibold uppercase tracking-[0.18em]">
+            Кабинет тренера
+          </p>
+          <h1 className="text-2xl font-semibold mt-0.5">Привет, {name}!</h1>
+        </div>
+        <LogoMark size={28} className="text-brand-accent shrink-0" />
       </header>
 
-      <nav className="flex gap-2 rounded-2xl bg-tg-secondaryBg p-1">
+      <nav className="flex gap-1 rounded-2xl bg-brand-surface brand-line p-1">
         <TabButton active={tab === 'clients'} onClick={() => setTab('clients')}>
           Клиенты
         </TabButton>
@@ -95,8 +101,10 @@ function TabButton({
 }) {
   return (
     <button
-      className={`flex-1 rounded-xl py-2 text-sm font-medium ${
-        active ? 'bg-tg-button text-tg-buttonText' : 'text-tg-hint'
+      className={`flex-1 rounded-xl py-2 text-[13px] font-semibold transition-colors ${
+        active
+          ? 'bg-brand-accent text-brand-onAccent shadow-card'
+          : 'text-brand-muted'
       }`}
       onClick={onClick}
     >
@@ -169,14 +177,14 @@ function ClientsTab({ onOpenChat }: { onOpenChat: (c: CoachChat) => void }) {
             <Stat value={overview.activity.weekWorkouts} label="трен. за 7 дн." />
           </div>
           {overview.activity.unansweredCheckins > 0 && (
-            <div className="rounded-2xl bg-tg-secondaryBg p-3 text-sm">
+            <div className="rounded-2xl bg-brand-surface brand-line shadow-card p-3 text-sm">
               💬 Check-in без ответа:{' '}
-              <span className="font-semibold">{overview.activity.unansweredCheckins}</span>
+              <span className="font-semibold text-brand-accent">{overview.activity.unansweredCheckins}</span>
             </div>
           )}
           {overview.attention.length > 0 && (
-            <div className="rounded-2xl bg-tg-secondaryBg p-3">
-              <div className="text-tg-hint text-xs font-medium mb-2">Требуют внимания</div>
+            <div className="rounded-2xl bg-brand-surface brand-line shadow-card p-3">
+              <div className="text-brand-muted text-[11px] font-semibold uppercase tracking-wide mb-2">Требуют внимания</div>
               <ul className="flex flex-col gap-1">
                 {overview.attention.map((a) => (
                   <li key={a.id} className="flex items-center justify-between text-sm">
@@ -192,7 +200,7 @@ function ClientsTab({ onOpenChat }: { onOpenChat: (c: CoachChat) => void }) {
 
       <section className="flex flex-col gap-2">
         <button
-          className="rounded-2xl bg-tg-button text-tg-buttonText p-4 font-medium disabled:opacity-60"
+          className="rounded-2xl bg-brand-accent text-brand-onAccent p-4 font-semibold shadow-card disabled:opacity-60"
           onClick={onInvite}
           disabled={inviting}
         >
@@ -200,7 +208,7 @@ function ClientsTab({ onOpenChat }: { onOpenChat: (c: CoachChat) => void }) {
         </button>
 
         {invite && (
-          <div className="rounded-2xl bg-tg-secondaryBg p-3 text-sm break-all">
+          <div className="rounded-2xl bg-brand-surface brand-line shadow-card p-3 text-sm break-all">
             <p className="text-tg-hint mb-1">
               Ссылка-приглашение (одноразовая, действует 7 дней):
             </p>
@@ -303,7 +311,7 @@ function ClientRow({
       : null;
 
   return (
-    <li className="rounded-2xl bg-tg-secondaryBg p-3">
+    <li className="rounded-2xl bg-brand-surface brand-line shadow-card p-3">
       <div className="flex items-center gap-2">
         <button className="flex-1 flex items-center justify-between text-left" onClick={toggle}>
           <div>
@@ -678,9 +686,9 @@ function CheckinCard({ checkin, onReplied }: { checkin: Checkin; onReplied: () =
 
 function Stat({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-2xl bg-tg-secondaryBg p-3 text-center">
-      <div className="text-2xl font-semibold">{value}</div>
-      <div className="text-tg-hint text-xs">{label}</div>
+    <div className="rounded-2xl bg-brand-surface brand-line shadow-card p-3 text-center">
+      <div className="text-2xl font-bold tabular text-brand-accent">{value}</div>
+      <div className="text-brand-muted text-[11px] mt-0.5">{label}</div>
     </div>
   );
 }

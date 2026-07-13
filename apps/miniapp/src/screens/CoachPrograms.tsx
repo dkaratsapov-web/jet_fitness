@@ -49,16 +49,16 @@ export function CoachPrograms() {
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
         <button
-          className="rounded-2xl bg-tg-button text-tg-buttonText p-4 font-medium"
+          className="rounded-2xl bg-brand-accent text-brand-onAccent p-4 font-semibold shadow-card"
           onClick={() => setBuilding(true)}
         >
-          ➕ Создать программу
+          ➕ Создать<br />программу
         </button>
         <button
-          className="rounded-2xl bg-brand-surface brand-line p-4 font-medium text-brand-accent"
+          className="rounded-2xl bg-brand-surface brand-line shadow-card p-4 font-semibold text-brand-accent"
           onClick={() => setLibrary(true)}
         >
-          🎬 Библиотека
+          🎬 Библиотека<br />упражнений
         </button>
       </div>
 
@@ -72,7 +72,7 @@ export function CoachPrograms() {
       ) : (
         <ul className="flex flex-col gap-2">
           {programs.map((p) => (
-            <li key={p.id} className="rounded-2xl bg-tg-secondaryBg p-3 flex flex-col gap-2">
+            <li key={p.id} className="rounded-2xl bg-brand-surface brand-line shadow-card p-3 flex flex-col gap-2">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="font-medium">{p.name}</div>
