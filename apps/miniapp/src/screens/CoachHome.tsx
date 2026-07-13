@@ -19,6 +19,7 @@ import { CoachPayments } from './CoachPayments';
 import { CoachChallenges } from './CoachChallenges';
 import { ChatScreen } from '../components/ChatScreen';
 import { LogoMark } from '../components/Logo';
+import { RoleSwitch } from '../components/RoleSwitch';
 
 const STATUS_LABEL: Record<CoachClient['status'], string> = {
   pending: 'ожидает',
@@ -37,7 +38,13 @@ export interface CoachChat {
 }
 
 // Coach cabinet (Phase 1): client list + invites + program builder.
-export function CoachHome({ session }: { session: SessionResponse }) {
+export function CoachHome({
+  session,
+  onSwitchRole,
+}: {
+  session: SessionResponse;
+  onSwitchRole?: () => void;
+}) {
   const name = session.user.firstName ?? 'тренер';
   const [tab, setTab] = useState<Tab>('clients');
   const [chat, setChat] = useState<CoachChat | null>(null);
@@ -65,7 +72,10 @@ export function CoachHome({ session }: { session: SessionResponse }) {
           <h1 className="text-2xl font-semibold mt-0.5">Привет, {name}!</h1>
           <hr className="jf-rule mt-2 w-24" />
         </div>
-        <LogoMark size={30} className="text-brand-accent shrink-0" />
+        <div className="flex items-center gap-2 shrink-0">
+          <RoleSwitch onClick={onSwitchRole} />
+          <LogoMark size={30} className="text-brand-accent" />
+        </div>
       </header>
 
       <nav className="jf-rise jf-rise-1 flex gap-1 rounded-2xl bg-brand-surface brand-line p-1">

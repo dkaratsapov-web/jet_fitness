@@ -7,6 +7,7 @@ import {
   type OwnerCoach,
   type OwnerClientRow,
 } from '../api';
+import { RoleSwitch } from '../components/RoleSwitch';
 
 type Tab = 'overview' | 'coaches' | 'clients';
 
@@ -15,19 +16,24 @@ export function OwnerHome({
   session,
   onEnterRole,
   busy,
+  onSwitchRole,
 }: {
   session: SessionResponse;
   onEnterRole?: (role: 'coach' | 'client') => void;
   busy?: boolean;
+  onSwitchRole?: () => void;
 }) {
   const name = session.user.firstName ?? 'владелец';
   const [tab, setTab] = useState<Tab>('overview');
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header>
-        <p className="text-tg-hint text-sm">Панель владельца платформы</p>
-        <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
+      <header className="flex items-start justify-between">
+        <div>
+          <p className="text-tg-hint text-sm">Панель владельца платформы</p>
+          <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
+        </div>
+        <RoleSwitch onClick={onSwitchRole} />
       </header>
 
       <nav className="flex gap-2 rounded-2xl bg-tg-secondaryBg p-1">

@@ -171,28 +171,21 @@ export function App() {
     return <RolePicker roles={session.roles} onPick={setActiveRole} />;
   }
 
+  const onSwitchRole = session.roles.length > 1 ? () => setActiveRole(null) : undefined;
+
   const home =
     activeRole === 'owner' ? (
-      <OwnerHome session={session} onEnterRole={enterRole} busy={busy} />
+      <OwnerHome session={session} onEnterRole={enterRole} busy={busy} onSwitchRole={onSwitchRole} />
     ) : activeRole === 'coach' ? (
-      <CoachHome session={session} />
+      <CoachHome session={session} onSwitchRole={onSwitchRole} />
     ) : (
-      <ClientHome session={session} />
+      <ClientHome session={session} onSwitchRole={onSwitchRole} />
     );
 
   return (
     <>
       <BgTexture />
       {home}
-      {session.roles.length > 1 && (
-        <button
-          className="fixed bottom-3 right-3 z-20 rounded-full bg-tg-secondaryBg/90 backdrop-blur px-3 py-1.5 text-xs text-tg-hint shadow"
-          onClick={() => setActiveRole(null)}
-          aria-label="Сменить роль"
-        >
-          ⇄ сменить роль
-        </button>
-      )}
     </>
   );
 }

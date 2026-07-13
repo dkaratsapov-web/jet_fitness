@@ -20,10 +20,17 @@ import { LogoMark } from '../components/Logo';
 import { Ring } from '../components/Ring';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 import { ChatScreen } from '../components/ChatScreen';
+import { RoleSwitch } from '../components/RoleSwitch';
 import type { NutritionDay, ProgressEntry, ChatContext } from '../api';
 
 // Client home (Phase 1): assigned program, run a workout, workout history.
-export function ClientHome({ session }: { session: SessionResponse }) {
+export function ClientHome({
+  session,
+  onSwitchRole,
+}: {
+  session: SessionResponse;
+  onSwitchRole?: () => void;
+}) {
   const name = session.user.firstName ?? 'спортсмен';
   const [program, setProgram] = useState<ClientProgram | null | undefined>(undefined);
   const [history, setHistory] = useState<WorkoutSummary[]>([]);
@@ -134,7 +141,10 @@ export function ClientHome({ session }: { session: SessionResponse }) {
           <p className="text-brand-muted text-sm">Личный кабинет</p>
           <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
         </div>
-        <LogoMark size={26} className="text-brand-accent" />
+        <div className="flex items-center gap-2 shrink-0">
+          <RoleSwitch onClick={onSwitchRole} />
+          <LogoMark size={26} className="text-brand-accent" />
+        </div>
       </header>
 
       {needsOnboarding && <OnboardingForm onDone={() => setNeedsOnboarding(false)} />}
