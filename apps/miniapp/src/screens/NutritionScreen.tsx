@@ -372,7 +372,7 @@ function AddMealModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-10" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50" onClick={onClose}>
       <div
         className="bg-tg-bg rounded-t-3xl w-full max-w-md p-4 flex flex-col gap-3 max-h-[88vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}

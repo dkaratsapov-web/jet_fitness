@@ -17,7 +17,7 @@ function isVideoUrl(u: string): boolean {
 export function ExerciseDetail({ ex, onClose }: { ex: ExerciseInfo; onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-end justify-center z-20"
+      className="fixed inset-0 bg-black/60 flex items-end justify-center z-50"
       onClick={onClose}
     >
       <div
