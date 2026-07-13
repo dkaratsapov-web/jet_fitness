@@ -92,6 +92,13 @@ jobs:
             EXTRA+=(--environment "ENABLE_TELEGRAM_WEBHOOK=false")
           fi
 
+          # Health module: only pass the vars when a key is set (yc rejects empty
+          # env values). Absent → module stays disabled via app defaults.
+          if [ -n "${HEALTH_ENCRYPTION_KEY:-}" ]; then
+            EXTRA+=(--environment "HEALTH_ENCRYPTION_KEY=$HEALTH_ENCRYPTION_KEY")
+            EXTRA+=(--environment "HEALTH_MODULE_ENABLED=${HEALTH_MODULE_ENABLED:-false}")
+          fi
+
           yc serverless function version create \
             --function-name jet-fitness-api \
             --runtime nodejs18 \
@@ -105,8 +112,6 @@ jobs:
             --environment "BOT_WEBHOOK_SECRET=$BOT_WEBHOOK_SECRET" \
             --environment "DATABASE_URL=$DATABASE_URL" \
             --environment "INITDATA_TTL_SECONDS=86400" \
-            --environment "HEALTH_MODULE_ENABLED=${HEALTH_MODULE_ENABLED:-false}" \
-            --environment "HEALTH_ENCRYPTION_KEY=${HEALTH_ENCRYPTION_KEY:-}" \
             --environment "OWNER_TELEGRAM_IDS=169920903" \
             --environment "MINIAPP_URL=https://storage.yandexcloud.net/jet-fitness-app/index.html" \
             --environment "BOT_USERNAME=coach_pro_bot" \
