@@ -129,10 +129,16 @@ export async function searchFatSecret(query: string): Promise<FoodHit[]> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${REST_URL}?${params.toString()}`, {
+    // Method-based integration: POST to /rest/server.api with the parameters in
+    // the form-urlencoded body (per FatSecret's docs), Bearer token in header.
+    const res = await fetch(REST_URL, {
       method: 'POST',
       signal: controller.signal,
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params,
     });
     if (!res.ok) return [];
     const json = (await res.json()) as { foods?: { food?: FsFood | FsFood[] } };
