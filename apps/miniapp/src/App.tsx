@@ -69,6 +69,20 @@ export function App() {
     }
   }
 
+  // Owner test-mode: enter the coach/client interface (registers the profile
+  // once so the real APIs work), then switch context. Idempotent.
+  async function enterRole(role: AppRole) {
+    setBusy(true);
+    try {
+      if (role === 'coach') await api.registerCoach();
+      else if (role === 'client') await api.registerClient();
+      const session = await loadSession(false);
+      if (session) setActiveRole(role);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (state.phase === 'loading') {
     return <Centered>Загрузка…</Centered>;
   }
@@ -159,7 +173,7 @@ export function App() {
 
   const home =
     activeRole === 'owner' ? (
-      <OwnerHome session={session} />
+      <OwnerHome session={session} onEnterRole={enterRole} busy={busy} />
     ) : activeRole === 'coach' ? (
       <CoachHome session={session} />
     ) : (

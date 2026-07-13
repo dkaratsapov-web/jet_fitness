@@ -11,7 +11,15 @@ import {
 type Tab = 'overview' | 'coaches' | 'clients';
 
 // Platform owner/operator home (spec §2). Distinct role: oversees the platform.
-export function OwnerHome({ session }: { session: SessionResponse }) {
+export function OwnerHome({
+  session,
+  onEnterRole,
+  busy,
+}: {
+  session: SessionResponse;
+  onEnterRole?: (role: 'coach' | 'client') => void;
+  busy?: boolean;
+}) {
   const name = session.user.firstName ?? 'владелец';
   const [tab, setTab] = useState<Tab>('overview');
 
@@ -33,6 +41,34 @@ export function OwnerHome({ session }: { session: SessionResponse }) {
           Клиенты
         </TabBtn>
       </nav>
+
+      {onEnterRole && (
+        <div className="rounded-2xl bg-brand-surface brand-line p-3 flex flex-col gap-2">
+          <div className="text-brand-muted text-xs font-medium">
+            Тестовый режим — открой приложение от лица роли
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="flex-1 rounded-xl bg-brand-accent text-brand-onAccent py-2.5 text-sm font-semibold disabled:opacity-60"
+              onClick={() => onEnterRole('coach')}
+              disabled={busy}
+            >
+              Открыть как тренер
+            </button>
+            <button
+              className="flex-1 rounded-xl bg-brand-surface2 py-2.5 text-sm font-semibold disabled:opacity-60"
+              onClick={() => onEnterRole('client')}
+              disabled={busy}
+            >
+              Открыть как клиент
+            </button>
+          </div>
+          <p className="text-brand-muted text-[11px]">
+            Ты получишь полноценный кабинет роли со своими тестовыми данными.
+            Вернуться — кнопкой «⇄ сменить роль» внизу экрана.
+          </p>
+        </div>
+      )}
 
       {tab === 'overview' && <Overview />}
       {tab === 'coaches' && <Coaches />}
