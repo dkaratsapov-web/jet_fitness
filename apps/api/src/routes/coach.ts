@@ -207,7 +207,7 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
         reply.code(400).send({ error: 'bad_request', reason: 'reply_required' });
         return;
       }
-      const checkin = await prisma.checkin.findUnique({
+      const checkin = await prisma.checkIn.findUnique({
         where: { id: request.params.id },
         select: { clientId: true },
       });
@@ -223,7 +223,7 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
         reply.code(403).send({ error: 'forbidden', reason: 'not_your_client' });
         return;
       }
-      await prisma.checkin.update({
+      await prisma.checkIn.update({
         where: { id: request.params.id },
         data: { coachReply: text, coachRepliedAt: new Date() },
       });

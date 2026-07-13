@@ -12,7 +12,7 @@
     "generate": "prisma generate",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "push": "prisma db push --skip-generate",
+    "push": "prisma db push --skip-generate --accept-data-loss",
     "studio": "prisma studio",
     "format": "prisma format"
   },

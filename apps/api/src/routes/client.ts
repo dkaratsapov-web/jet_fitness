@@ -237,7 +237,7 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
       reply.code(400).send({ error: 'bad_request', reason: 'empty_checkin' });
       return;
     }
-    const checkin = await prisma.checkin.create({
+    const checkin = await prisma.checkIn.create({
       data: {
         clientId: auth.userId,
         weightKg: b.weightKg ?? null,
@@ -245,7 +245,7 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
         energy: clamp(b.energy, 1, 5),
         adherencePct: clamp(b.adherencePct, 0, 100),
         mood: clamp(b.mood, 1, 5),
-        comment: b.comment?.trim() || null,
+        notes: b.comment?.trim() || null,
       },
       select: { id: true },
     });
@@ -267,7 +267,7 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
 
 /** Shared: a client's check-ins, newest first. */
 export async function listCheckins(clientId: string) {
-  const rows = await prisma.checkin.findMany({
+  const rows = await prisma.checkIn.findMany({
     where: { clientId },
     orderBy: { date: 'desc' },
     take: 30,
@@ -280,7 +280,7 @@ export async function listCheckins(clientId: string) {
     energy: c.energy,
     adherencePct: c.adherencePct,
     mood: c.mood,
-    comment: c.comment,
+    comment: c.notes,
     coachReply: c.coachReply,
     coachRepliedAt: c.coachRepliedAt,
   }));
