@@ -1,5 +1,11 @@
-import { useEffect, useState } from 'react';
-import { api, type ProgressEntry, type ProgressInput } from '../api';
+import { useEffect, useRef, useState } from 'react';
+import {
+  api,
+  type ProgressEntry,
+  type ProgressInput,
+  type ProgressPhoto,
+  type PhotoType,
+} from '../api';
 
 // Body measurement fields (JSON keys → Russian labels), cm.
 const MEASURES: Array<{ key: string; label: string }> = [
@@ -109,6 +115,8 @@ export function ProgressScreen({ onBack }: { onBack: () => void }) {
         </button>
       </section>
 
+      <PhotoSection />
+
       <section>
         <h2 className="text-lg font-semibold mb-2">История</h2>
         {entries === null ? (
@@ -164,6 +172,101 @@ function NumField({
         onChange={(e) => onChange(e.target.value)}
       />
     </label>
+  );
+}
+
+const PHOTO_LABELS: Record<PhotoType, string> = {
+  front: 'Спереди',
+  side: 'Сбоку',
+  back: 'Сзади',
+};
+
+function PhotoSection() {
+  const [photos, setPhotos] = useState<ProgressPhoto[] | null>(null);
+  const [type, setType] = useState<PhotoType>('front');
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function load() {
+    api.clientPhotos().then(setPhotos).catch(() => setPhotos([]));
+  }
+  useEffect(load, []);
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setError(null);
+    setUploading(true);
+    try {
+      await api.uploadProgressPhoto(type, file);
+      setPhotos(null);
+      load();
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl bg-tg-secondaryBg p-3 flex flex-col gap-3">
+      <div className="font-medium">Фото прогресса</div>
+      <div className="flex gap-2">
+        {(Object.keys(PHOTO_LABELS) as PhotoType[]).map((t) => (
+          <button
+            key={t}
+            className={`flex-1 rounded-xl py-2 text-sm ${
+              type === t ? 'bg-tg-button text-tg-buttonText' : 'bg-tg-bg text-tg-hint'
+            }`}
+            onClick={() => setType(t)}
+          >
+            {PHOTO_LABELS[t]}
+          </button>
+        ))}
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onFile}
+      />
+      <button
+        className="rounded-xl bg-tg-button text-tg-buttonText p-3 font-medium disabled:opacity-60"
+        onClick={() => fileRef.current?.click()}
+        disabled={uploading}
+      >
+        {uploading ? 'Загружаем…' : `📷 Добавить фото (${PHOTO_LABELS[type].toLowerCase()})`}
+      </button>
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+
+      {photos && photos.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {photos.map((p) =>
+            p.viewUrl ? (
+              <a
+                key={p.id}
+                href={p.viewUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block"
+              >
+                <img
+                  src={p.viewUrl}
+                  alt={PHOTO_LABELS[p.type]}
+                  className="w-full aspect-square object-cover rounded-xl"
+                />
+                <div className="text-tg-hint text-[10px] mt-1 text-center">
+                  {PHOTO_LABELS[p.type]} · {formatDate(p.date)}
+                </div>
+              </a>
+            ) : null,
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 

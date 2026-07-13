@@ -8,6 +8,7 @@ import {
   type WorkoutSummary,
   type ProgressEntry,
   type Checkin,
+  type ProgressPhoto,
 } from '../api';
 import { CoachPrograms } from './CoachPrograms';
 import { CoachPayments } from './CoachPayments';
@@ -174,6 +175,7 @@ function ClientRow({ client }: { client: CoachClient }) {
   const [workouts, setWorkouts] = useState<WorkoutSummary[] | null>(null);
   const [progress, setProgress] = useState<ProgressEntry[] | null>(null);
   const [checkins, setCheckins] = useState<Checkin[] | null>(null);
+  const [photos, setPhotos] = useState<ProgressPhoto[] | null>(null);
 
   function loadCheckins() {
     api
@@ -194,6 +196,10 @@ function ClientRow({ client }: { client: CoachClient }) {
         .coachClientProgress(client.id)
         .then(setProgress)
         .catch(() => setProgress([]));
+      api
+        .coachClientPhotos(client.id)
+        .then(setPhotos)
+        .catch(() => setPhotos([]));
       loadCheckins();
     }
   }
@@ -237,6 +243,25 @@ function ClientRow({ client }: { client: CoachClient }) {
               )}
             </div>
           )}
+          {photos && photos.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <div className="text-tg-hint text-xs font-medium">Фото прогресса</div>
+              <div className="grid grid-cols-4 gap-2">
+                {photos.map((p) =>
+                  p.viewUrl ? (
+                    <a key={p.id} href={p.viewUrl} target="_blank" rel="noreferrer">
+                      <img
+                        src={p.viewUrl}
+                        alt="фото"
+                        className="w-full aspect-square object-cover rounded-lg"
+                      />
+                    </a>
+                  ) : null,
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="text-tg-hint text-xs font-medium">Тренировки</div>
           {workouts === null ? (
             <p className="text-tg-hint text-xs">Загрузка…</p>

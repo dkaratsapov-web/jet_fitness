@@ -175,6 +175,15 @@ export interface ProgressInput {
   measurements?: Record<string, number> | null;
 }
 
+export type PhotoType = 'front' | 'side' | 'back';
+
+export interface ProgressPhoto {
+  id: string;
+  date: string;
+  type: PhotoType;
+  viewUrl: string | null;
+}
+
 export interface Checkin {
   id: string;
   date: string;
@@ -263,6 +272,8 @@ export const api = {
     request<WorkoutSummary[]>(`/api/coach/clients/${clientId}/workouts`),
   coachClientProgress: (clientId: string) =>
     request<ProgressEntry[]>(`/api/coach/clients/${clientId}/progress`),
+  coachClientPhotos: (clientId: string) =>
+    request<ProgressPhoto[]>(`/api/coach/clients/${clientId}/progress-photos`),
   coachClientCheckins: (clientId: string) =>
     request<Checkin[]>(`/api/coach/clients/${clientId}/checkins`),
   replyCheckin: (checkinId: string, reply: string) =>
@@ -285,6 +296,25 @@ export const api = {
       body: JSON.stringify(body),
     }),
   clientProgress: () => request<ProgressEntry[]>('/api/client/progress'),
+  clientPhotos: () => request<ProgressPhoto[]>('/api/client/progress-photos'),
+  // Upload flow: presign → PUT the file straight to storage → confirm.
+  uploadProgressPhoto: async (type: PhotoType, file: File) => {
+    const ext = (file.name.split('.').pop() ?? 'jpg').toLowerCase();
+    const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(
+      '/api/client/progress-photos/presign',
+      { method: 'POST', body: JSON.stringify({ type, ext }) },
+    );
+    const put = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'content-type': file.type || 'application/octet-stream' },
+    });
+    if (!put.ok) throw new Error(`upload failed: ${put.status}`);
+    return request<{ ok: boolean; id: string }>('/api/client/progress-photos', {
+      method: 'POST',
+      body: JSON.stringify({ type, fileKey }),
+    });
+  },
   addCheckin: (body: CheckinInput) =>
     request<{ ok: boolean; id: string }>('/api/client/checkins', {
       method: 'POST',

@@ -4,10 +4,15 @@
 //   POST /client/workouts  — log a completed workout for one program day.
 //   GET  /client/workouts  — recent workout history.
 
+import { randomBytes } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
-import { prisma } from '@jet/db';
+import { prisma, type ProgressPhotoType } from '@jet/db';
 import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
 import { notifyClientsCoaches } from '../notify.js';
+import { presign, isStorageConfigured } from '../storage.js';
+
+const PHOTO_TYPES: ProgressPhotoType[] = ['front', 'side', 'back'];
+const PHOTO_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic']);
 
 interface SetInput {
   programExerciseId: string;
@@ -211,6 +216,63 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
     return listProgress(auth.userId);
   });
 
+  // ── Progress photos (Object Storage, presigned upload) ──────────
+  // 1) ask for an upload URL, 2) PUT the file straight to storage,
+  // 3) confirm to persist the object key.
+  fastify.post<{ Body: { type?: string; ext?: string } }>(
+    '/client/progress-photos/presign',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!isStorageConfigured()) {
+        reply.code(503).send({ error: 'unavailable', reason: 'storage_not_configured' });
+        return;
+      }
+      const auth = request.auth!;
+      const type = (request.body?.type ?? 'front') as ProgressPhotoType;
+      if (!PHOTO_TYPES.includes(type)) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_type' });
+        return;
+      }
+      const ext = (request.body?.ext ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!PHOTO_EXTS.has(ext)) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_ext' });
+        return;
+      }
+      const fileKey = `progress/${auth.userId}/${Date.now()}-${randomBytes(6).toString('hex')}.${ext}`;
+      const uploadUrl = presign('PUT', fileKey, 900);
+      return { uploadUrl, fileKey };
+    },
+  );
+
+  fastify.post<{ Body: { type?: string; fileKey?: string } }>(
+    '/client/progress-photos',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      const auth = request.auth!;
+      const type = (request.body?.type ?? 'front') as ProgressPhotoType;
+      const fileKey = request.body?.fileKey;
+      if (!fileKey || !PHOTO_TYPES.includes(type)) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_photo' });
+        return;
+      }
+      // Guard against cross-user keys.
+      if (!fileKey.startsWith(`progress/${auth.userId}/`)) {
+        reply.code(403).send({ error: 'forbidden', reason: 'key_mismatch' });
+        return;
+      }
+      const photo = await prisma.progressPhoto.create({
+        data: { clientId: auth.userId, date: new Date(), type, fileKey },
+        select: { id: true },
+      });
+      return { ok: true, id: photo.id };
+    },
+  );
+
+  fastify.get('/client/progress-photos', { preHandler: fastify.requireAuth }, async (request) => {
+    const auth = request.auth!;
+    return listProgressPhotos(auth.userId);
+  });
+
   // ── Check-ins: periodic self-report to the coach ────────────────
   fastify.post<{
     Body: {
@@ -283,6 +345,22 @@ export async function listCheckins(clientId: string) {
     comment: c.notes,
     coachReply: c.coachReply,
     coachRepliedAt: c.coachRepliedAt,
+  }));
+}
+
+/** Shared: a client's progress photos with short-lived view URLs, newest first. */
+export async function listProgressPhotos(clientId: string) {
+  const photos = await prisma.progressPhoto.findMany({
+    where: { clientId },
+    orderBy: { date: 'desc' },
+    take: 60,
+  });
+  const canView = isStorageConfigured();
+  return photos.map((p) => ({
+    id: p.id,
+    date: p.date,
+    type: p.type,
+    viewUrl: canView ? presign('GET', p.fileKey, 3600) : null,
   }));
 }
 

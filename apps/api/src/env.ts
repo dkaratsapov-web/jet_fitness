@@ -54,6 +54,16 @@ export const env = {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
+
+  // Object Storage (Yandex, S3-compatible) for user uploads (progress photos,
+  // technique videos). Presigned PUT/GET URLs are generated in-process.
+  s3: {
+    endpoint: optional('S3_ENDPOINT', 'https://storage.yandexcloud.net').replace(/\/+$/, ''),
+    bucket: optional('S3_BUCKET', ''),
+    region: optional('S3_REGION', 'ru-central1'),
+    accessKeyId: optional('S3_KEY', ''),
+    secretAccessKey: optional('S3_SECRET', ''),
+  },
 } as const;
 
 export type Env = typeof env;

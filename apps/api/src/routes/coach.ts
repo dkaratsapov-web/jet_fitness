@@ -13,7 +13,7 @@ import { prisma } from '@jet/db';
 import { env } from '../env.js';
 import { requireCoach } from '../auth/guards.js';
 import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
-import { listProgress, listCheckins } from './client.js';
+import { listProgress, listCheckins, listProgressPhotos } from './client.js';
 import { notifyUser } from '../notify.js';
 
 const INVITE_TTL_DAYS = 7;
@@ -173,6 +173,25 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
         return;
       }
       return listProgress(request.params.id);
+    },
+  );
+
+  // A client's progress photos (short-lived view URLs).
+  fastify.get<{ Params: { id: string } }>(
+    '/coach/clients/:id/progress-photos',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const link = await prisma.coachClient.findUnique({
+        where: { coachId_clientId: { coachId: auth.userId, clientId: request.params.id } },
+        select: { id: true },
+      });
+      if (!link) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      return listProgressPhotos(request.params.id);
     },
   );
 
