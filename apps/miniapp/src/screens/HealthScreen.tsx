@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { api, type LabResult, type Supplement } from '../api';
+import { useEffect, useRef, useState } from 'react';
+import { api, type LabResult, type Supplement, type LabMarkerDraft } from '../api';
 import { LineChart } from '../components/LineChart';
 
 // Health module (Phase 3, SENSITIVE): consent gate → labs + supplements.
@@ -164,6 +164,9 @@ function LabsSection({ labs, onChanged }: { labs: LabResult[] | null; onChanged:
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-lg font-semibold">Анализы</h2>
+
+      <LabScanUploader onSaved={onChanged} />
+
       <div className="rounded-2xl bg-tg-secondaryBg p-3 flex flex-col gap-2">
         <div className="grid grid-cols-3 gap-2">
           <input
@@ -242,6 +245,186 @@ function LabsSection({ labs, onChanged }: { labs: LabResult[] | null; onChanged:
         })
       )}
     </section>
+  );
+}
+
+// Upload a PDF/photo of lab results → recognized in Yandex Cloud (RF) →
+// review & edit the extracted markers → save. Data never leaves the country.
+function LabScanUploader({ onSaved }: { onSaved: () => void }) {
+  const [available, setAvailable] = useState<boolean | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'working' | 'review' | 'saving'>('idle');
+  const [drafts, setDrafts] = useState<LabMarkerDraft[]>([]);
+  const [fileKey, setFileKey] = useState<string | null>(null);
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    api.labsOcrStatus().then((s) => setAvailable(s.available)).catch(() => setAvailable(false));
+  }, []);
+
+  if (available === false) return null; // OCR not configured — hide the block
+
+  async function onFile(file: File) {
+    setError(null);
+    setPhase('working');
+    try {
+      const r = await api.recognizeLabScan(file);
+      if (!r.ok || r.markers.length === 0) {
+        setError(
+          r.reason === 'ocr_failed'
+            ? 'Не удалось распознать. Загрузите файл почётче.'
+            : 'Показатели не найдены — попробуйте другой файл или введите вручную.',
+        );
+        setPhase('idle');
+        return;
+      }
+      setDrafts(r.markers);
+      setFileKey(r.fileKey);
+      setPhase('review');
+    } catch {
+      setError('Ошибка загрузки. Проверьте, что файл — PDF или фото.');
+      setPhase('idle');
+    }
+  }
+
+  function patch(i: number, p: Partial<LabMarkerDraft>) {
+    setDrafts((d) => d.map((m, idx) => (idx === i ? { ...m, ...p } : m)));
+  }
+  function drop(i: number) {
+    setDrafts((d) => d.filter((_, idx) => idx !== i));
+  }
+
+  async function save() {
+    setPhase('saving');
+    try {
+      await api.saveLabsBulk({ date, sourceFileKey: fileKey ?? undefined, markers: drafts });
+      setDrafts([]);
+      setFileKey(null);
+      setPhase('idle');
+      onSaved();
+    } catch {
+      setError('Не удалось сохранить.');
+      setPhase('review');
+    }
+  }
+
+  return (
+    <div className="jf-card p-3 flex flex-col gap-2">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/pdf,image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onFile(f);
+          e.target.value = '';
+        }}
+      />
+
+      {phase === 'idle' && (
+        <>
+          <button
+            className="rounded-xl bg-brand-accent text-brand-onAccent py-2.5 text-sm font-semibold"
+            onClick={() => fileRef.current?.click()}
+          >
+            📄 Распознать анализы из PDF / фото
+          </button>
+          <p className="text-brand-muted text-[11px]">
+            Распознавание в Яндекс.Облаке (данные в РФ). Показатели можно поправить перед
+            сохранением.
+          </p>
+        </>
+      )}
+
+      {phase === 'working' && (
+        <p className="text-brand-muted text-sm py-2 text-center">Распознаю… это займёт несколько секунд</p>
+      )}
+
+      {(phase === 'review' || phase === 'saving') && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">Найдено: {drafts.length}</span>
+            <input
+              type="date"
+              className="rounded-lg bg-tg-bg px-2 py-1 text-xs outline-none"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <ul className="flex flex-col gap-2 max-h-72 overflow-y-auto">
+            {drafts.map((m, i) => (
+              <li key={i} className="rounded-xl bg-tg-bg p-2 flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    className="flex-1 rounded-md bg-tg-secondaryBg p-1.5 text-sm outline-none"
+                    value={m.marker}
+                    onChange={(e) => patch(i, { marker: e.target.value })}
+                  />
+                  <button className="text-brand-muted text-xs px-1" onClick={() => drop(i)}>
+                    ✕
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  <input
+                    className="rounded-md bg-tg-secondaryBg p-1.5 text-sm outline-none"
+                    inputMode="decimal"
+                    placeholder="знач."
+                    value={String(m.value)}
+                    onChange={(e) => patch(i, { value: Number(e.target.value) })}
+                  />
+                  <input
+                    className="rounded-md bg-tg-secondaryBg p-1.5 text-sm outline-none"
+                    placeholder="ед."
+                    value={m.unit ?? ''}
+                    onChange={(e) => patch(i, { unit: e.target.value || null })}
+                  />
+                  <input
+                    className="rounded-md bg-tg-secondaryBg p-1.5 text-sm outline-none"
+                    inputMode="decimal"
+                    placeholder="норма от"
+                    value={m.refLow ?? ''}
+                    onChange={(e) =>
+                      patch(i, { refLow: e.target.value ? Number(e.target.value) : null })
+                    }
+                  />
+                  <input
+                    className="rounded-md bg-tg-secondaryBg p-1.5 text-sm outline-none"
+                    inputMode="decimal"
+                    placeholder="норма до"
+                    value={m.refHigh ?? ''}
+                    onChange={(e) =>
+                      patch(i, { refHigh: e.target.value ? Number(e.target.value) : null })
+                    }
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
+            <button
+              className="flex-1 rounded-xl bg-brand-accent text-brand-onAccent py-2.5 text-sm font-semibold disabled:opacity-60"
+              onClick={save}
+              disabled={phase === 'saving' || drafts.length === 0}
+            >
+              {phase === 'saving' ? 'Сохраняю…' : `Сохранить ${drafts.length}`}
+            </button>
+            <button
+              className="rounded-xl bg-tg-bg px-3 text-sm text-brand-muted"
+              onClick={() => {
+                setDrafts([]);
+                setPhase('idle');
+              }}
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-xs" style={{ color: 'var(--neg)' }}>{error}</p>}
+    </div>
   );
 }
 

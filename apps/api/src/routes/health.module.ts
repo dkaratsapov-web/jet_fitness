@@ -30,6 +30,11 @@ import { prisma, type SupplementCreator } from '@jet/db';
 import { env } from '../env.js';
 import { requireCoach } from '../auth/guards.js';
 import { encrypt, decrypt, isEncryptionConfigured } from '../health/crypto.js';
+import { presign, isStorageConfigured } from '../storage.js';
+import { recognizeLab, isLabOcrConfigured } from '../health/labOcr.js';
+import { randomBytes } from 'node:crypto';
+
+const LAB_EXTS = new Set(['pdf', 'png', 'jpg', 'jpeg']);
 
 /** Module must be enabled AND have a working key. */
 function moduleAvailable(): boolean {
@@ -123,6 +128,102 @@ export const healthModuleRoutes: FastifyPluginAsync = async (fastify) => {
       select: { id: true },
     });
     return { ok: true, id: row.id };
+  });
+
+  // ── Lab OCR (Yandex Vision + YandexGPT; data stays in RF) ───────
+  // 1) presign an upload  2) recognize markers (not saved)  3) bulk-save the
+  // reviewed markers. The scanned file key is stored encrypted on each row.
+  fastify.get('/client/health/labs/ocr-status', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    if (!(await requireConsent(request, reply))) return;
+    return { available: isLabOcrConfigured() && isStorageConfigured() };
+  });
+
+  fastify.post<{ Body: { ext?: string } }>(
+    '/client/health/labs/presign',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireConsent(request, reply))) return;
+      if (!isStorageConfigured()) {
+        reply.code(503).send({ error: 'unavailable', reason: 'storage_not_configured' });
+        return;
+      }
+      const ext = (request.body?.ext ?? 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!LAB_EXTS.has(ext)) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_ext' });
+        return;
+      }
+      const fileKey = `health-labs/${request.auth!.userId}/${Date.now()}-${randomBytes(6).toString('hex')}.${ext}`;
+      return { uploadUrl: presign('PUT', fileKey, 900), fileKey };
+    },
+  );
+
+  fastify.post<{ Body: { fileKey?: string } }>(
+    '/client/health/labs/recognize',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireConsent(request, reply))) return;
+      const fileKey = request.body?.fileKey;
+      if (!fileKey || !fileKey.startsWith(`health-labs/${request.auth!.userId}/`)) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_file' });
+        return;
+      }
+      if (!isLabOcrConfigured()) {
+        reply.code(503).send({ error: 'unavailable', reason: 'ocr_not_configured' });
+        return;
+      }
+      const ext = fileKey.split('.').pop() ?? '';
+      // Pull the uploaded file back from storage and recognize it.
+      let bytes: Buffer | null = null;
+      try {
+        const res = await fetch(presign('GET', fileKey, 300));
+        if (res.ok) bytes = Buffer.from(await res.arrayBuffer());
+      } catch {
+        bytes = null;
+      }
+      if (!bytes) {
+        reply.code(502).send({ error: 'bad_gateway', reason: 'download_failed' });
+        return;
+      }
+      const result = await recognizeLab(bytes, ext);
+      return { ok: result.ok, markers: result.markers, reason: result.reason ?? null, fileKey };
+    },
+  );
+
+  fastify.post<{
+    Body: {
+      date?: string;
+      sourceFileKey?: string;
+      markers?: Array<{ marker?: string; value?: number; unit?: string; refLow?: number; refHigh?: number }>;
+    };
+  }>('/client/health/labs/bulk', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    if (!(await requireConsent(request, reply))) return;
+    const b = request.body ?? {};
+    const clientId = request.auth!.userId;
+    const date = b.date ? new Date(b.date) : new Date();
+    const sourceFileKeyEnc =
+      b.sourceFileKey && b.sourceFileKey.startsWith(`health-labs/${clientId}/`)
+        ? encrypt(b.sourceFileKey)
+        : null;
+    const rows = (b.markers ?? []).filter(
+      (m) => m.marker?.trim() && m.value != null && Number.isFinite(Number(m.value)),
+    );
+    if (rows.length === 0) {
+      reply.code(400).send({ error: 'bad_request', reason: 'no_markers' });
+      return;
+    }
+    await prisma.labResult.createMany({
+      data: rows.map((m) => ({
+        clientId,
+        date,
+        marker: m.marker!.trim().slice(0, 120),
+        valueEnc: encrypt(String(Number(m.value))),
+        unit: m.unit?.trim() || null,
+        refLow: m.refLow ?? null,
+        refHigh: m.refHigh ?? null,
+        sourceFileKeyEnc,
+      })),
+    });
+    return { ok: true, count: rows.length };
   });
 
   fastify.get('/client/health/labs', { preHandler: fastify.requireAuth }, async (request, reply) => {

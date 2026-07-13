@@ -245,6 +245,15 @@ export interface LabResult {
   refHigh: number | null;
 }
 
+// A recognized / editable lab marker before saving.
+export interface LabMarkerDraft {
+  marker: string;
+  value: number;
+  unit: string | null;
+  refLow: number | null;
+  refHigh: number | null;
+}
+
 export interface Supplement {
   id: string;
   name: string;
@@ -626,6 +635,36 @@ export const api = {
     request<LabResult[]>(`/api/client/health/labs/${encodeURIComponent(marker)}`),
   deleteLab: (id: string) =>
     request<{ ok: boolean }>(`/api/client/health/labs/${id}`, { method: 'DELETE' }),
+  // Lab OCR (Yandex Vision + YandexGPT): upload a PDF/photo, recognize markers.
+  labsOcrStatus: () =>
+    request<{ available: boolean }>('/api/client/health/labs/ocr-status'),
+  recognizeLabScan: async (file: File) => {
+    const ext = (file.name.split('.').pop() ?? 'pdf').toLowerCase();
+    const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(
+      '/api/client/health/labs/presign',
+      { method: 'POST', body: JSON.stringify({ ext }) },
+    );
+    const put = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'content-type': file.type || 'application/octet-stream' },
+    });
+    if (!put.ok) throw new Error(`upload failed: ${put.status}`);
+    return request<{
+      ok: boolean;
+      markers: LabMarkerDraft[];
+      reason: string | null;
+      fileKey: string;
+    }>('/api/client/health/labs/recognize', {
+      method: 'POST',
+      body: JSON.stringify({ fileKey }),
+    });
+  },
+  saveLabsBulk: (body: { date?: string; sourceFileKey?: string; markers: LabMarkerDraft[] }) =>
+    request<{ ok: boolean; count: number }>('/api/client/health/labs/bulk', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   supplements: () => request<Supplement[]>('/api/client/health/supplements'),
   addSupplement: (body: { name: string; dose?: string; remindersOn?: boolean }) =>
     request<{ ok: boolean; id: string }>('/api/client/health/supplements', {

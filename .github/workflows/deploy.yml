@@ -70,6 +70,10 @@ jobs:
           # AND a 32-byte HEALTH_ENCRYPTION_KEY secret is provided.
           HEALTH_MODULE_ENABLED: ${{ secrets.HEALTH_MODULE_ENABLED }}
           HEALTH_ENCRYPTION_KEY: ${{ secrets.HEALTH_ENCRYPTION_KEY }}
+          # Lab OCR (Yandex Vision + YandexGPT). Folder id enables it; the
+          # function's service account must have ai.vision.user +
+          # ai.languageModels.user. Falls back to YC_FOLDER_ID when set.
+          YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
           # FatSecret nutrition API (optional). When set, food search uses it
           # first. Requires whitelisting this function's egress IP in FatSecret.
           FATSECRET_CLIENT_ID: ${{ secrets.FATSECRET_CLIENT_ID }}
@@ -106,6 +110,13 @@ jobs:
           if [ -n "${HEALTH_ENCRYPTION_KEY:-}" ]; then
             EXTRA+=(--environment "HEALTH_ENCRYPTION_KEY=$HEALTH_ENCRYPTION_KEY")
             EXTRA+=(--environment "HEALTH_MODULE_ENABLED=${HEALTH_MODULE_ENABLED:-true}")
+          fi
+
+          # Lab OCR folder id (fall back to YC_FOLDER_ID if the dedicated
+          # secret isn't set, since it's the same folder).
+          YFID="${YANDEX_FOLDER_ID:-$YC_FOLDER_ID}"
+          if [ -n "${YFID:-}" ]; then
+            EXTRA+=(--environment "YANDEX_FOLDER_ID=$YFID")
           fi
 
           # FatSecret: only pass when configured (yc rejects empty env values).

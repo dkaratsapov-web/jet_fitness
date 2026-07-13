@@ -40,6 +40,12 @@ export const env = {
   // 32-byte key (hex or base64) for AES-256-GCM encryption of sensitive health
   // fields. Required when the health module is enabled.
   healthEncryptionKey: optional('HEALTH_ENCRYPTION_KEY', ''),
+
+  // Lab OCR via Yandex Vision + YandexGPT (data stays in RF — 152-ФЗ). The
+  // function authenticates with its own service-account IAM token (fetched from
+  // the metadata service, no secret); only the folder id is needed. The SA must
+  // have roles ai.vision.user and ai.languageModels.user.
+  yandexFolderId: optional('YANDEX_FOLDER_ID', ''),
   platformFeePercent: Number(optional('PLATFORM_FEE_PERCENT', '10')),
 
   // FatSecret Platform API (nutrition database). When both are set, food search
