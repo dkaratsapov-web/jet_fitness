@@ -137,6 +137,16 @@ jobs:
             -w "\n-> HTTP %{http_code}\n" "$API_GATEWAY_URL/api/auth/session" || true
 
       # ── 3. Mini App static -> Object Storage ────────────────
+      # Premium ambient background texture (generated with Higgsfield). Fetched
+      # here because the agent session's egress proxy blocks the CDN; the runner
+      # has open internet. Non-fatal: the CSS gracefully falls back to the pure
+      # gradient background if the asset is missing.
+      - name: Fetch premium background texture
+        run: |
+          curl -fsSL --max-time 30 \
+            "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260713_220341_65918d8c-f4e0-4486-b1a8-df21cc2b34a2.png" \
+            -o apps/miniapp/public/brand/app-bg.png && echo "background fetched" || echo "background fetch skipped"
+
       - name: Build Mini App
         run: npm run build --workspace @jet/miniapp
         env:

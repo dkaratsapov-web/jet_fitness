@@ -162,11 +162,12 @@ h2 {
   position: relative;
   border-radius: 1rem;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 44%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E"),
     var(--surface);
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.5),
-    0 16px 34px -20px rgba(0, 0, 0, 0.8);
+    0 16px 34px -20px rgba(0, 0, 0, 0.85);
 }
 .jf-card::before {
   content: '';
@@ -175,11 +176,11 @@ h2 {
   border-radius: inherit;
   padding: 1px;
   background: linear-gradient(
-    155deg,
-    rgba(217, 189, 131, 0.6),
-    rgba(201, 169, 106, 0.14) 38%,
-    rgba(201, 169, 106, 0.04) 62%,
-    transparent 82%
+    150deg,
+    rgba(224, 197, 141, 0.75),
+    rgba(201, 169, 106, 0.2) 34%,
+    rgba(201, 169, 106, 0.05) 60%,
+    transparent 80%
   );
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,

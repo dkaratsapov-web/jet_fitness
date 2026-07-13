@@ -182,6 +182,7 @@ export function App() {
 
   return (
     <>
+      <BgTexture />
       {home}
       {session.roles.length > 1 && (
         <button
@@ -193,6 +194,22 @@ export function App() {
         </button>
       )}
     </>
+  );
+}
+
+// Subtle premium ambient texture (generated with Higgsfield). The asset is
+// fetched onto the deploy runner; if it is missing the dark veil renders alone
+// and nothing breaks. Sits behind all content.
+function BgTexture() {
+  const url = import.meta.env.BASE_URL + 'brand/app-bg.png';
+  return (
+    <div
+      aria-hidden
+      className="fixed inset-0 -z-10 pointer-events-none bg-cover bg-center bg-no-repeat"
+      style={{
+        backgroundImage: `linear-gradient(180deg, rgba(8,9,11,0.74), rgba(8,9,11,0.9)), url("${url}")`,
+      }}
+    />
   );
 }
 
