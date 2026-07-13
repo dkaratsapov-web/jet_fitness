@@ -175,6 +175,30 @@ export interface ProgressInput {
   measurements?: Record<string, number> | null;
 }
 
+export type Sex = 'male' | 'female' | 'other';
+
+export interface ClientProfile {
+  goal: string | null;
+  sex: Sex | null;
+  heightCm: number | null;
+  birthDate: string | null;
+  filled: boolean;
+}
+
+export interface FormVideoComment {
+  id: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface FormVideo {
+  id: string;
+  createdAt: string;
+  exerciseName: string | null;
+  viewUrl: string | null;
+  comments: FormVideoComment[];
+}
+
 export type PhotoType = 'front' | 'side' | 'back';
 
 export interface ProgressPhoto {
@@ -274,6 +298,13 @@ export const api = {
     request<ProgressEntry[]>(`/api/coach/clients/${clientId}/progress`),
   coachClientPhotos: (clientId: string) =>
     request<ProgressPhoto[]>(`/api/coach/clients/${clientId}/progress-photos`),
+  coachClientVideos: (clientId: string) =>
+    request<FormVideo[]>(`/api/coach/clients/${clientId}/form-videos`),
+  commentVideo: (videoId: string, body: string) =>
+    request<{ ok: boolean }>(`/api/coach/form-videos/${videoId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
   coachClientCheckins: (clientId: string) =>
     request<Checkin[]>(`/api/coach/clients/${clientId}/checkins`),
   replyCheckin: (checkinId: string, reply: string) =>
@@ -297,6 +328,30 @@ export const api = {
     }),
   clientProgress: () => request<ProgressEntry[]>('/api/client/progress'),
   clientPhotos: () => request<ProgressPhoto[]>('/api/client/progress-photos'),
+  clientProfile: () => request<ClientProfile>('/api/client/profile'),
+  updateProfile: (body: { goal?: string; sex?: Sex; heightCm?: number; birthDate?: string }) =>
+    request<{ ok: boolean }>('/api/client/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  clientVideos: () => request<FormVideo[]>('/api/client/form-videos'),
+  uploadFormVideo: async (file: File) => {
+    const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase();
+    const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(
+      '/api/client/form-videos/presign',
+      { method: 'POST', body: JSON.stringify({ ext }) },
+    );
+    const put = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'content-type': file.type || 'application/octet-stream' },
+    });
+    if (!put.ok) throw new Error(`upload failed: ${put.status}`);
+    return request<{ ok: boolean; id: string }>('/api/client/form-videos', {
+      method: 'POST',
+      body: JSON.stringify({ fileKey }),
+    });
+  },
   // Upload flow: presign → PUT the file straight to storage → confirm.
   uploadProgressPhoto: async (type: PhotoType, file: File) => {
     const ext = (file.name.split('.').pop() ?? 'jpg').toLowerCase();

@@ -9,6 +9,9 @@ import {
 import { WorkoutSession } from './WorkoutSession';
 import { ProgressScreen } from './ProgressScreen';
 import { CheckinScreen } from './CheckinScreen';
+import { TechniqueScreen } from './TechniqueScreen';
+import { OnboardingForm } from './OnboardingForm';
+import { LineChart } from '../components/LineChart';
 
 // Client home (Phase 1): assigned program, run a workout, workout history.
 export function ClientHome({ session }: { session: SessionResponse }) {
@@ -16,7 +19,8 @@ export function ClientHome({ session }: { session: SessionResponse }) {
   const [program, setProgram] = useState<ClientProgram | null | undefined>(undefined);
   const [history, setHistory] = useState<WorkoutSummary[]>([]);
   const [active, setActive] = useState<{ day: ClientProgramDay; index: number } | null>(null);
-  const [view, setView] = useState<'home' | 'progress' | 'checkin'>('home');
+  const [view, setView] = useState<'home' | 'progress' | 'checkin' | 'technique'>('home');
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   function loadHistory() {
     api.clientWorkouts().then(setHistory).catch(() => setHistory([]));
@@ -27,6 +31,10 @@ export function ClientHome({ session }: { session: SessionResponse }) {
       .clientProgram()
       .then((r) => setProgram(r.program))
       .catch(() => setProgram(null));
+    api
+      .clientProfile()
+      .then((p) => setNeedsOnboarding(!p.filled))
+      .catch(() => setNeedsOnboarding(false));
     loadHistory();
   }, []);
 
@@ -52,12 +60,18 @@ export function ClientHome({ session }: { session: SessionResponse }) {
     return <CheckinScreen onBack={() => setView('home')} />;
   }
 
+  if (view === 'technique') {
+    return <TechniqueScreen onBack={() => setView('home')} />;
+  }
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <header>
         <p className="text-tg-hint text-sm">Личный кабинет</p>
         <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
       </header>
+
+      {needsOnboarding && <OnboardingForm onDone={() => setNeedsOnboarding(false)} />}
 
       {program === undefined ? (
         <p className="text-tg-hint text-sm">Загрузка…</p>
@@ -87,15 +101,17 @@ export function ClientHome({ session }: { session: SessionResponse }) {
           <div className="text-base font-medium">Check-in</div>
           <div className="text-tg-hint text-xs mt-1">самочувствие</div>
         </button>
-        {['Питание', 'Техника'].map((label) => (
-          <div
-            key={label}
-            className="rounded-2xl bg-tg-secondaryBg p-4 text-center opacity-60"
-          >
-            <div className="text-base font-medium">{label}</div>
-            <div className="text-tg-hint text-xs mt-1">скоро</div>
-          </div>
-        ))}
+        <button
+          className="rounded-2xl bg-tg-secondaryBg p-4 text-center"
+          onClick={() => setView('technique')}
+        >
+          <div className="text-base font-medium">Техника</div>
+          <div className="text-tg-hint text-xs mt-1">видео-разбор</div>
+        </button>
+        <div className="rounded-2xl bg-tg-secondaryBg p-4 text-center opacity-60">
+          <div className="text-base font-medium">Питание</div>
+          <div className="text-tg-hint text-xs mt-1">скоро</div>
+        </div>
       </div>
     </div>
   );
@@ -170,9 +186,21 @@ function ProgramView({
 }
 
 function History({ items }: { items: WorkoutSummary[] }) {
+  // Oldest→newest volume series for the trend chart.
+  const volumePoints = [...items]
+    .filter((w) => w.totalVolume > 0)
+    .reverse()
+    .map((w) => ({ value: w.totalVolume, label: formatShort(w.date) }));
+
   return (
     <section>
       <h2 className="text-lg font-semibold mb-2">История тренировок</h2>
+      {volumePoints.length >= 2 && (
+        <div className="rounded-2xl bg-tg-secondaryBg p-3 mb-2">
+          <div className="text-tg-hint text-xs mb-1">Динамика объёма</div>
+          <LineChart points={volumePoints} unit=" кг" />
+        </div>
+      )}
       <ul className="flex flex-col gap-2">
         {items.map((w) => (
           <li
@@ -198,6 +226,10 @@ function History({ items }: { items: WorkoutSummary[] }) {
       </ul>
     </section>
   );
+}
+
+function formatShort(iso: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
 function formatDate(iso: string): string {

@@ -6,13 +6,15 @@
 
 import { randomBytes } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
-import { prisma, type ProgressPhotoType } from '@jet/db';
+import { prisma, type ProgressPhotoType, type Sex } from '@jet/db';
 import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
 import { notifyClientsCoaches } from '../notify.js';
 import { presign, isStorageConfigured } from '../storage.js';
 
 const PHOTO_TYPES: ProgressPhotoType[] = ['front', 'side', 'back'];
 const PHOTO_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic']);
+const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm', 'm4v']);
+const SEXES: Sex[] = ['male', 'female', 'other'];
 
 interface SetInput {
   programExerciseId: string;
@@ -36,6 +38,49 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
       return { ok: true, isClient: true };
     },
   );
+
+  // Client profile (onboarding questionnaire): goal / sex / height / birth date.
+  fastify.get('/client/profile', { preHandler: fastify.requireAuth }, async (request) => {
+    const auth = request.auth!;
+    const p = await prisma.clientProfile.findUnique({ where: { userId: auth.userId } });
+    return {
+      goal: p?.goal ?? null,
+      sex: p?.sex ?? null,
+      heightCm: p?.heightCm ?? null,
+      birthDate: p?.birthDate ?? null,
+      // "Filled" once the essentials (goal + sex + height) are set.
+      filled: Boolean(p?.goal && p?.sex && p?.heightCm),
+    };
+  });
+
+  fastify.patch<{
+    Body: { goal?: string; sex?: string; heightCm?: number; birthDate?: string };
+  }>('/client/profile', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    const auth = request.auth!;
+    const b = request.body ?? {};
+    const sex = b.sex && SEXES.includes(b.sex as Sex) ? (b.sex as Sex) : undefined;
+    if (b.sex && !sex) {
+      reply.code(400).send({ error: 'bad_request', reason: 'invalid_sex' });
+      return;
+    }
+    await prisma.clientProfile.upsert({
+      where: { userId: auth.userId },
+      update: {
+        goal: b.goal?.trim() || undefined,
+        sex,
+        heightCm: b.heightCm ?? undefined,
+        birthDate: b.birthDate ? new Date(b.birthDate) : undefined,
+      },
+      create: {
+        userId: auth.userId,
+        goal: b.goal?.trim() || null,
+        sex,
+        heightCm: b.heightCm ?? null,
+        birthDate: b.birthDate ? new Date(b.birthDate) : null,
+      },
+    });
+    return { ok: true };
+  });
 
   // Current client's active program (the one their coach handed them).
   fastify.get(
@@ -273,6 +318,55 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
     return listProgressPhotos(auth.userId);
   });
 
+  // ── Technique videos (client uploads, coach comments) ───────────
+  fastify.post<{ Body: { ext?: string } }>(
+    '/client/form-videos/presign',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!isStorageConfigured()) {
+        reply.code(503).send({ error: 'unavailable', reason: 'storage_not_configured' });
+        return;
+      }
+      const auth = request.auth!;
+      const ext = (request.body?.ext ?? 'mp4').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!VIDEO_EXTS.has(ext)) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_ext' });
+        return;
+      }
+      const fileKey = `technique/${auth.userId}/${Date.now()}-${randomBytes(6).toString('hex')}.${ext}`;
+      const uploadUrl = presign('PUT', fileKey, 1800);
+      return { uploadUrl, fileKey };
+    },
+  );
+
+  fastify.post<{ Body: { fileKey?: string; exerciseId?: string } }>(
+    '/client/form-videos',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      const auth = request.auth!;
+      const fileKey = request.body?.fileKey;
+      if (!fileKey || !fileKey.startsWith(`technique/${auth.userId}/`)) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_video' });
+        return;
+      }
+      const video = await prisma.formVideo.create({
+        data: {
+          clientId: auth.userId,
+          videoUrl: fileKey,
+          exerciseId: request.body?.exerciseId || null,
+        },
+        select: { id: true },
+      });
+      await notifyClientsCoaches(auth.userId, '🎥 Клиент загрузил видео техники на разбор.');
+      return { ok: true, id: video.id };
+    },
+  );
+
+  fastify.get('/client/form-videos', { preHandler: fastify.requireAuth }, async (request) => {
+    const auth = request.auth!;
+    return listFormVideos(auth.userId);
+  });
+
   // ── Check-ins: periodic self-report to the coach ────────────────
   fastify.post<{
     Body: {
@@ -345,6 +439,27 @@ export async function listCheckins(clientId: string) {
     comment: c.notes,
     coachReply: c.coachReply,
     coachRepliedAt: c.coachRepliedAt,
+  }));
+}
+
+/** Shared: a client's technique videos with view URLs + coach comments. */
+export async function listFormVideos(clientId: string) {
+  const videos = await prisma.formVideo.findMany({
+    where: { clientId },
+    orderBy: { createdAt: 'desc' },
+    take: 40,
+    include: {
+      exercise: { select: { name: true } },
+      comments: { orderBy: { createdAt: 'asc' }, select: { id: true, body: true, createdAt: true } },
+    },
+  });
+  const canView = isStorageConfigured();
+  return videos.map((v) => ({
+    id: v.id,
+    createdAt: v.createdAt,
+    exerciseName: v.exercise?.name ?? null,
+    viewUrl: canView ? presign('GET', v.videoUrl, 3600) : null,
+    comments: v.comments,
   }));
 }
 
