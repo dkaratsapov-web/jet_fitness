@@ -11,6 +11,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { requireCoach } from '../auth/guards.js';
+import { notifyUser } from '../notify.js';
 
 // A small starter library so a new coach can build a program immediately.
 // Seeded lazily (once) when no global exercises exist yet.
@@ -260,7 +261,7 @@ export const programRoutes: FastifyPluginAsync = async (fastify) => {
       // Program must belong to this coach.
       const program = await prisma.program.findFirst({
         where: { id: request.params.id, coachId: auth.userId },
-        select: { id: true },
+        select: { id: true, name: true },
       });
       if (!program) {
         reply.code(404).send({ error: 'not_found', reason: 'program_not_found' });
@@ -287,6 +288,11 @@ export const programRoutes: FastifyPluginAsync = async (fastify) => {
           select: { id: true, startDate: true },
         });
       });
+
+      await notifyUser(
+        clientId,
+        `🏋️ Тренер выдал вам новую программу «${program.name}». Откройте приложение, чтобы начать.`,
+      );
       return { ok: true, assignmentId: assignment.id, startDate: assignment.startDate };
     },
   );

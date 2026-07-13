@@ -7,6 +7,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { parseStartParam, type SessionResponse, type AppRole } from '@jet/shared';
 import { env } from '../env.js';
+import { notifyUser } from '../notify.js';
 
 interface Roles {
   roles: AppRole[];
@@ -118,6 +119,14 @@ async function bindInvite(
       create: { userId: clientId },
     }),
   ]);
+
+  // Notify the coach that a new client joined via their invite.
+  const client = await prisma.user.findUnique({
+    where: { id: clientId },
+    select: { firstName: true, username: true },
+  });
+  const who = client?.firstName || (client?.username ? `@${client.username}` : 'Новый клиент');
+  await notifyUser(invite.coachId, `🎉 ${who} присоединился(ась) к вам по приглашению.`);
 }
 
 async function resolveUserAndRoles(userId: string) {

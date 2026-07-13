@@ -14,6 +14,7 @@ import { env } from '../env.js';
 import { requireCoach } from '../auth/guards.js';
 import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
 import { listProgress, listCheckins } from './client.js';
+import { notifyUser } from '../notify.js';
 
 const INVITE_TTL_DAYS = 7;
 
@@ -226,6 +227,7 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: request.params.id },
         data: { coachReply: text, coachRepliedAt: new Date() },
       });
+      await notifyUser(checkin.clientId, '💬 Тренер ответил на ваш check-in. Загляните в приложение.');
       return { ok: true };
     },
   );

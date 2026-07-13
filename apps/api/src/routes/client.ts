@@ -7,6 +7,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
+import { notifyClientsCoaches } from '../notify.js';
 
 interface SetInput {
   programExerciseId: string;
@@ -248,6 +249,13 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
       },
       select: { id: true },
     });
+
+    const me = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { firstName: true, username: true },
+    });
+    const who = me?.firstName || (me?.username ? `@${me.username}` : 'Клиент');
+    await notifyClientsCoaches(auth.userId, `📝 ${who} отправил(а) новый check-in.`);
     return { ok: true, id: checkin.id };
   });
 
