@@ -40,28 +40,24 @@ export function getInitData(): string {
   return getWebApp()?.initData ?? '';
 }
 
-/** Push Telegram theme params into CSS variables consumed by Tailwind. */
-function applyTheme(wa: TelegramWebApp): void {
-  const p = wa.themeParams;
-  const root = document.documentElement.style;
-  const set = (name: string, value: string | undefined) => {
-    if (value) root.setProperty(name, value);
-  };
-  set('--tg-bg', p.bg_color);
-  set('--tg-text', p.text_color);
-  set('--tg-hint', p.hint_color);
-  set('--tg-link', p.link_color);
-  set('--tg-button', p.button_color);
-  set('--tg-button-text', p.button_text_color);
-  set('--tg-secondary-bg', p.secondary_bg_color);
+/*
+ * Jet Fitness uses its own fixed premium palette (Graphite + Champagne Gold),
+ * so we do NOT adopt Telegram's theme colors. We only follow the light/dark
+ * *scheme* — dark is the primary brand look, so we default to dark and switch
+ * to the light variant only when Telegram reports a light scheme.
+ */
+function applyScheme(wa: TelegramWebApp): void {
+  const scheme = wa.colorScheme === 'light' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', scheme);
 }
 
-/** Call once at startup: mark ready, expand, apply theme, wire theme changes. */
+/** Call once at startup: mark ready, expand, set brand scheme, wire changes. */
 export function initTelegram(): void {
+  document.documentElement.setAttribute('data-theme', 'dark');
   const wa = getWebApp();
   if (!wa) return;
   wa.ready();
   wa.expand();
-  applyTheme(wa);
-  wa.onEvent('themeChanged', () => applyTheme(wa));
+  applyScheme(wa);
+  wa.onEvent('themeChanged', () => applyScheme(wa));
 }

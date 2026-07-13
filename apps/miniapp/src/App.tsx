@@ -5,6 +5,7 @@ import { CoachHome } from './screens/CoachHome';
 import { ClientHome } from './screens/ClientHome';
 import { OwnerHome } from './screens/OwnerHome';
 import { RolePicker } from './screens/RolePicker';
+import { Logo } from './components/Logo';
 
 type State =
   | { phase: 'loading' }
@@ -118,32 +119,33 @@ export function App() {
   if (session.roles.length === 0) {
     return (
       <Centered>
-        <div className="text-center max-w-xs flex flex-col gap-4">
-          <div>
-            <h1 className="text-xl font-semibold mb-2">Добро пожаловать!</h1>
-            <p className="text-tg-hint text-sm">
-              Выберите, как хотите начать. Тренер заводит кабинет и приглашает
-              клиентов. Клиент может войти сам, а тренера подключить позже —
-              например по ссылке-приглашению.
+        <div className="text-center max-w-xs flex flex-col gap-5">
+          <div className="flex flex-col items-center gap-3">
+            <Logo height={92} className="text-brand-text" />
+            <p className="text-brand-muted text-sm">
+              Твой тренер и весь прогресс — в одном приложении. Тренер ведёт
+              подопечных, ты тренируешься, следишь за питанием и результатом.
             </p>
           </div>
-          <button
-            className="rounded-2xl bg-tg-button text-tg-buttonText p-4 font-medium disabled:opacity-60"
-            onClick={becomeCoach}
-            disabled={busy}
-          >
-            {busy ? 'Создаём кабинет…' : 'Я тренер — создать кабинет'}
-          </button>
-          <button
-            className="rounded-2xl bg-tg-secondaryBg p-4 font-medium disabled:opacity-60"
-            onClick={becomeClient}
-            disabled={busy}
-          >
-            {busy ? 'Входим…' : 'Я клиент — войти'}
-          </button>
-          <p className="text-tg-hint text-xs">
-            Получили ссылку-приглашение от тренера? Просто откройте её — вы
-            попадёте сразу к своему тренеру.
+          <div className="flex flex-col gap-3">
+            <button
+              className="rounded-2xl bg-brand-accent text-brand-onAccent p-4 font-semibold disabled:opacity-60"
+              onClick={becomeCoach}
+              disabled={busy}
+            >
+              {busy ? 'Создаём кабинет…' : 'Я тренер — создать кабинет'}
+            </button>
+            <button
+              className="rounded-2xl bg-brand-surface brand-line p-4 font-medium disabled:opacity-60"
+              onClick={becomeClient}
+              disabled={busy}
+            >
+              {busy ? 'Входим…' : 'Я клиент — войти'}
+            </button>
+          </div>
+          <p className="text-brand-muted text-xs">
+            Получил ссылку-приглашение от тренера? Просто открой её — попадёшь
+            сразу к своему тренеру.
           </p>
         </div>
       </Centered>

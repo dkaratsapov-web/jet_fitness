@@ -15,6 +15,7 @@ import { NutritionScreen } from './NutritionScreen';
 import { HealthScreen } from './HealthScreen';
 import { OnboardingForm } from './OnboardingForm';
 import { LineChart } from '../components/LineChart';
+import { LogoMark } from '../components/Logo';
 
 // Client home (Phase 1): assigned program, run a workout, workout history.
 export function ClientHome({ session }: { session: SessionResponse }) {
@@ -83,9 +84,12 @@ export function ClientHome({ session }: { session: SessionResponse }) {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <header>
-        <p className="text-tg-hint text-sm">Личный кабинет</p>
-        <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
+      <header className="flex items-center justify-between">
+        <div>
+          <p className="text-brand-muted text-sm">Личный кабинет</p>
+          <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
+        </div>
+        <LogoMark size={26} className="text-brand-accent" />
       </header>
 
       {needsOnboarding && <OnboardingForm onDone={() => setNeedsOnboarding(false)} />}

@@ -2,15 +2,61 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Fallback theme (overwritten from Telegram theme params at runtime). */
-  --tg-bg: #ffffff;
-  --tg-text: #000000;
-  --tg-hint: #999999;
-  --tg-link: #2481cc;
-  --tg-button: #2481cc;
-  --tg-button-text: #ffffff;
-  --tg-secondary-bg: #f1f1f1;
+/*
+ * Jet Fitness brand theme — "Graphite + Champagne Gold" (premium).
+ * The app is dark-first; a light variant is applied via [data-theme="light"].
+ * Existing components use the tg-* tokens, so we remap those tokens to brand
+ * values here — restyling the whole app from one place.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  --bg: #0c0d0f; /* matte black base */
+  --surface: #16181c; /* graphite card */
+  --surface-2: #1f2228; /* raised / inputs */
+  --text: #f4f1ea; /* off-white */
+  --muted: #8a8f98; /* muted gray */
+  --accent: #c9a96a; /* champagne gold */
+  --accent-strong: #d9bd83;
+  --on-accent: #0c0d0f;
+  --line: rgba(201, 169, 106, 0.16);
+  --pos: #5fbf8f;
+  --neg: #e0736a;
+
+  /* Legacy tg-* tokens remapped to the brand palette. */
+  --tg-bg: var(--bg);
+  --tg-secondary-bg: var(--surface);
+  --tg-text: var(--text);
+  --tg-hint: var(--muted);
+  --tg-link: var(--accent);
+  --tg-button: var(--accent);
+  --tg-button-text: var(--on-accent);
+
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --bg: #f4f1ea;
+  --surface: #ffffff;
+  --surface-2: #ece8df;
+  --text: #16181c;
+  --muted: #6b6f76;
+  --accent: #b08d4c;
+  --accent-strong: #9a7a3f;
+  --on-accent: #0c0d0f;
+  --line: rgba(12, 13, 15, 0.1);
+  --pos: #2f9e6b;
+  --neg: #c65648;
+
+  --tg-bg: var(--bg);
+  --tg-secondary-bg: var(--surface);
+  --tg-text: var(--text);
+  --tg-hint: var(--muted);
+  --tg-link: var(--accent);
+  --tg-button: var(--accent);
+  --tg-button-text: var(--on-accent);
+
+  color-scheme: light;
 }
 
 html,
@@ -21,12 +67,37 @@ body,
 
 body {
   margin: 0;
-  background: var(--tg-bg);
-  color: var(--tg-text);
+  background: var(--bg);
+  color: var(--text);
   font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
-    sans-serif;
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Inter,
+    Roboto, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   /* Respect device safe areas (spec §9). */
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Premium typographic touches */
+h1,
+h2 {
+  letter-spacing: -0.01em;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.brand-line {
+  border: 1px solid var(--line);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
