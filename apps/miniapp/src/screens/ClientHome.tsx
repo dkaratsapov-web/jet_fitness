@@ -5,6 +5,7 @@ import {
   type ClientProgram,
   type ClientProgramDay,
   type WorkoutSummary,
+  type ClientChallenge,
 } from '../api';
 import { WorkoutSession } from './WorkoutSession';
 import { ProgressScreen } from './ProgressScreen';
@@ -19,6 +20,7 @@ export function ClientHome({ session }: { session: SessionResponse }) {
   const name = session.user.firstName ?? 'спортсмен';
   const [program, setProgram] = useState<ClientProgram | null | undefined>(undefined);
   const [history, setHistory] = useState<WorkoutSummary[]>([]);
+  const [challenges, setChallenges] = useState<ClientChallenge[]>([]);
   const [active, setActive] = useState<{ day: ClientProgramDay; index: number } | null>(null);
   const [view, setView] = useState<
     'home' | 'progress' | 'checkin' | 'technique' | 'nutrition'
@@ -38,6 +40,7 @@ export function ClientHome({ session }: { session: SessionResponse }) {
       .clientProfile()
       .then((p) => setNeedsOnboarding(!p.filled))
       .catch(() => setNeedsOnboarding(false));
+    api.clientChallenges().then(setChallenges).catch(() => setChallenges([]));
     loadHistory();
   }, []);
 
@@ -90,6 +93,8 @@ export function ClientHome({ session }: { session: SessionResponse }) {
           onStart={(day, index) => setActive({ day, index })}
         />
       )}
+
+      {challenges.length > 0 && <Challenges items={challenges} />}
 
       {history.length > 0 && <History items={history} />}
 
@@ -236,6 +241,52 @@ function History({ items }: { items: WorkoutSummary[] }) {
       </ul>
     </section>
   );
+}
+
+function Challenges({ items }: { items: ClientChallenge[] }) {
+  return (
+    <section>
+      <h2 className="text-lg font-semibold mb-2">Челленджи</h2>
+      <div className="flex flex-col gap-2">
+        {items.map((ch) => (
+          <div key={ch.id} className="rounded-2xl bg-tg-secondaryBg p-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="font-medium">{ch.name}</div>
+              {ch.myRank && (
+                <div className="text-sm">
+                  <span className="text-tg-hint">место</span>{' '}
+                  <span className="font-semibold">
+                    {ch.myRank}/{ch.total}
+                  </span>
+                </div>
+              )}
+            </div>
+            <ul className="flex flex-col gap-1">
+              {ch.leaderboard.slice(0, 5).map((r) => (
+                <li
+                  key={r.clientId}
+                  className={`flex items-center justify-between text-sm ${
+                    r.rank <= 3 ? 'font-medium' : ''
+                  }`}
+                >
+                  <span>
+                    <span className="text-tg-hint">{medal(r.rank)}</span> {r.name}
+                  </span>
+                  <span>
+                    {r.score} {ch.unit}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function medal(rank: number): string {
+  return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
 }
 
 function formatShort(iso: string): string {

@@ -4,6 +4,7 @@ import {
   type SessionResponse,
   type CoachClient,
   type CoachDashboard,
+  type CoachOverview,
   type Invite,
   type WorkoutSummary,
   type ProgressEntry,
@@ -14,6 +15,7 @@ import {
 } from '../api';
 import { CoachPrograms } from './CoachPrograms';
 import { CoachPayments } from './CoachPayments';
+import { CoachChallenges } from './CoachChallenges';
 
 const STATUS_LABEL: Record<CoachClient['status'], string> = {
   pending: 'ожидает',
@@ -22,7 +24,7 @@ const STATUS_LABEL: Record<CoachClient['status'], string> = {
   ended: 'завершён',
 };
 
-type Tab = 'clients' | 'programs' | 'payments';
+type Tab = 'clients' | 'programs' | 'payments' | 'challenges';
 
 // Coach cabinet (Phase 1): client list + invites + program builder.
 export function CoachHome({ session }: { session: SessionResponse }) {
@@ -46,11 +48,15 @@ export function CoachHome({ session }: { session: SessionResponse }) {
         <TabButton active={tab === 'payments'} onClick={() => setTab('payments')}>
           Оплаты
         </TabButton>
+        <TabButton active={tab === 'challenges'} onClick={() => setTab('challenges')}>
+          Челленджи
+        </TabButton>
       </nav>
 
       {tab === 'clients' && <ClientsTab />}
       {tab === 'programs' && <CoachPrograms />}
       {tab === 'payments' && <CoachPayments />}
+      {tab === 'challenges' && <CoachChallenges />}
     </div>
   );
 }
@@ -80,14 +86,20 @@ function TabButton({
 function ClientsTab() {
   const [clients, setClients] = useState<CoachClient[] | null>(null);
   const [dash, setDash] = useState<CoachDashboard | null>(null);
+  const [overview, setOverview] = useState<CoachOverview | null>(null);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [inviting, setInviting] = useState(false);
   const [copied, setCopied] = useState(false);
 
   async function reload() {
-    const [c, d] = await Promise.all([api.coachClients(), api.coachDashboard()]);
+    const [c, d, o] = await Promise.all([
+      api.coachClients(),
+      api.coachDashboard(),
+      api.coachOverview().catch(() => null),
+    ]);
     setClients(c);
     setDash(d);
+    setOverview(o);
   }
 
   useEffect(() => {
@@ -122,6 +134,35 @@ function ClientsTab() {
           <Stat value={dash.activeClients} label="активных" />
           <Stat value={dash.pendingInvites} label="приглашений" />
         </div>
+      )}
+
+      {overview && (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <Stat value={overview.business.monthRevenue} label="₽ за месяц" />
+            <Stat value={overview.business.activeSubscriptions} label="подписок" />
+            <Stat value={overview.activity.weekWorkouts} label="трен. за 7 дн." />
+          </div>
+          {overview.activity.unansweredCheckins > 0 && (
+            <div className="rounded-2xl bg-tg-secondaryBg p-3 text-sm">
+              💬 Check-in без ответа:{' '}
+              <span className="font-semibold">{overview.activity.unansweredCheckins}</span>
+            </div>
+          )}
+          {overview.attention.length > 0 && (
+            <div className="rounded-2xl bg-tg-secondaryBg p-3">
+              <div className="text-tg-hint text-xs font-medium mb-2">Требуют внимания</div>
+              <ul className="flex flex-col gap-1">
+                {overview.attention.map((a) => (
+                  <li key={a.id} className="flex items-center justify-between text-sm">
+                    <span>{a.name}</span>
+                    <span className="text-red-400 text-xs">{a.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
       )}
 
       <section className="flex flex-col gap-2">

@@ -78,6 +78,13 @@ export interface CoachDashboard {
   pendingInvites: number;
 }
 
+export interface CoachOverview {
+  clients: { total: number; active: number; pendingInvites: number };
+  business: { monthRevenue: number; activeSubscriptions: number };
+  activity: { weekWorkouts: number; unansweredCheckins: number };
+  attention: Array<{ id: string; name: string; reason: string }>;
+}
+
 export interface ExerciseLite {
   id: string;
   name: string;
@@ -202,11 +209,51 @@ export interface NutritionDay {
   meals: NutritionMeal[];
 }
 
+export interface NutritionWeek {
+  target: Macros | null;
+  days: Array<{ date: string; kcal: number; protein: number; fat: number; carbs: number }>;
+  averages: Macros;
+  loggedDays: number;
+}
+
 export interface FoodSearchItem {
   id: string;
   name: string;
   barcode: string | null;
   per100: Macros;
+}
+
+export type ChallengeType = 'steps' | 'workouts' | 'weight' | 'custom';
+
+export interface LeaderRow {
+  rank: number;
+  clientId: string;
+  name: string;
+  score: number;
+}
+
+export interface CoachChallenge {
+  id: string;
+  name: string;
+  type: ChallengeType;
+  unit: string;
+  startDate: string;
+  endDate: string;
+  manualScore: boolean;
+  leaderboard: LeaderRow[];
+}
+
+export interface ClientChallenge {
+  id: string;
+  name: string;
+  type: ChallengeType;
+  unit: string;
+  startDate: string;
+  endDate: string;
+  myRank: number | null;
+  myScore: number;
+  total: number;
+  leaderboard: LeaderRow[];
 }
 
 export type Sex = 'male' | 'female' | 'other';
@@ -304,6 +351,7 @@ export const api = {
     request<{ ok: boolean }>('/api/coach/register', { method: 'POST' }),
   coachClients: () => request<CoachClient[]>('/api/coach/clients'),
   coachDashboard: () => request<CoachDashboard>('/api/coach/dashboard'),
+  coachOverview: () => request<CoachOverview>('/api/coach/overview'),
   createInvite: () => request<Invite>('/api/coach/invites', { method: 'POST' }),
 
   // Programs (Phase 1)
@@ -341,6 +389,27 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  // Challenges (Phase 2)
+  coachChallenges: () => request<CoachChallenge[]>('/api/coach/challenges'),
+  createChallenge: (body: {
+    name: string;
+    type: ChallengeType;
+    startDate: string;
+    endDate: string;
+    clientIds: string[];
+  }) =>
+    request<{ ok: boolean; id: string }>('/api/coach/challenges', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  setChallengeScore: (id: string, clientId: string, score: number) =>
+    request<{ ok: boolean }>(`/api/coach/challenges/${id}/score`, {
+      method: 'POST',
+      body: JSON.stringify({ clientId, score }),
+    }),
+  deleteChallenge: (id: string) =>
+    request<{ ok: boolean }>(`/api/coach/challenges/${id}`, { method: 'DELETE' }),
   commentVideo: (videoId: string, body: string) =>
     request<{ ok: boolean }>(`/api/coach/form-videos/${videoId}/comments`, {
       method: 'POST',
@@ -380,6 +449,7 @@ export const api = {
   // Nutrition (Phase 2)
   nutritionDay: (date?: string) =>
     request<NutritionDay>(`/api/client/nutrition/day${date ? `?date=${date}` : ''}`),
+  nutritionWeek: () => request<NutritionWeek>('/api/client/nutrition/week'),
   addMeal: (body: {
     mealType: MealType;
     grams: number;
@@ -399,6 +469,7 @@ export const api = {
     ),
   lookupBarcode: (code: string) =>
     request<{ food: FoodSearchItem }>(`/api/client/nutrition/foods/barcode/${code}`),
+  clientChallenges: () => request<ClientChallenge[]>('/api/client/challenges'),
   uploadFormVideo: async (file: File) => {
     const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase();
     const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(
