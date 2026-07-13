@@ -142,6 +142,25 @@ export interface ClientProgram {
   days: ClientProgramDay[];
 }
 
+// One logged set sent to POST /client/workouts.
+export interface WorkoutSetInput {
+  programExerciseId: string;
+  setNumber: number;
+  actualReps?: number | null;
+  actualWeight?: number | null;
+  rpe?: number | null;
+}
+
+export interface WorkoutSummary {
+  id: string;
+  date: string;
+  completedAt: string | null;
+  dayTitle: string | null;
+  setCount: number;
+  exerciseCount: number;
+  totalVolume: number;
+}
+
 export const api = {
   session: () => request<SessionResponse>('/api/auth/session', { method: 'POST' }),
   me: () => request<SessionResponse>('/api/me'),
@@ -177,7 +196,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ clientId }),
     }),
+  coachClientWorkouts: (clientId: string) =>
+    request<WorkoutSummary[]>(`/api/coach/clients/${clientId}/workouts`),
 
   // Client (Phase 1)
   clientProgram: () => request<{ program: ClientProgram | null }>('/api/client/program'),
+  logWorkout: (programDayId: string, sets: WorkoutSetInput[]) =>
+    request<{ ok: boolean; workoutId: string; date: string }>('/api/client/workouts', {
+      method: 'POST',
+      body: JSON.stringify({ programDayId, sets }),
+    }),
+  clientWorkouts: () => request<WorkoutSummary[]>('/api/client/workouts'),
 };

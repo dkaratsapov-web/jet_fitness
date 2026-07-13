@@ -5,6 +5,7 @@ import {
   type CoachClient,
   type CoachDashboard,
   type Invite,
+  type WorkoutSummary,
 } from '../api';
 import { CoachPrograms } from './CoachPrograms';
 
@@ -150,26 +151,81 @@ function ClientsTab() {
         ) : (
           <ul className="flex flex-col gap-2">
             {clients.map((c) => (
-              <li
-                key={c.id}
-                className="rounded-2xl bg-tg-secondaryBg p-3 flex items-center justify-between"
-              >
-                <div>
-                  <div className="font-medium">
-                    {c.firstName ?? 'Клиент'}
-                    {c.username && (
-                      <span className="text-tg-hint font-normal"> @{c.username}</span>
-                    )}
-                  </div>
-                  {c.goal && <div className="text-tg-hint text-xs">{c.goal}</div>}
-                </div>
-                <span className="text-tg-hint text-xs">{STATUS_LABEL[c.status]}</span>
-              </li>
+              <ClientRow key={c.id} client={c} />
             ))}
           </ul>
         )}
       </section>
     </div>
+  );
+}
+
+// A client row that expands to show their recent logged workouts.
+function ClientRow({ client }: { client: CoachClient }) {
+  const [open, setOpen] = useState(false);
+  const [workouts, setWorkouts] = useState<WorkoutSummary[] | null>(null);
+
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && workouts === null) {
+      api
+        .coachClientWorkouts(client.id)
+        .then(setWorkouts)
+        .catch(() => setWorkouts([]));
+    }
+  }
+
+  return (
+    <li className="rounded-2xl bg-tg-secondaryBg p-3">
+      <button className="w-full flex items-center justify-between text-left" onClick={toggle}>
+        <div>
+          <div className="font-medium">
+            {client.firstName ?? 'Клиент'}
+            {client.username && (
+              <span className="text-tg-hint font-normal"> @{client.username}</span>
+            )}
+          </div>
+          {client.goal && <div className="text-tg-hint text-xs">{client.goal}</div>}
+        </div>
+        <span className="text-tg-hint text-xs">
+          {STATUS_LABEL[client.status]} {open ? '▲' : '▾'}
+        </span>
+      </button>
+
+      {open && (
+        <div className="mt-3 border-t border-tg-bg pt-3">
+          {workouts === null ? (
+            <p className="text-tg-hint text-xs">Загрузка…</p>
+          ) : workouts.length === 0 ? (
+            <p className="text-tg-hint text-xs">Пока нет выполненных тренировок.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {workouts.map((w) => (
+                <li key={w.id} className="rounded-xl bg-tg-bg p-2 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium">{w.dayTitle || 'Тренировка'}</div>
+                    <div className="text-tg-hint text-xs">
+                      {new Date(w.date).toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}{' '}
+                      · {w.exerciseCount} упр. · {w.setCount} подх.
+                    </div>
+                  </div>
+                  {w.totalVolume > 0 && (
+                    <div className="text-right">
+                      <div className="text-sm font-semibold">{w.totalVolume}</div>
+                      <div className="text-tg-hint text-[10px]">объём, кг</div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </li>
   );
 }
 

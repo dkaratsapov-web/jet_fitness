@@ -12,6 +12,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { env } from '../env.js';
 import { requireCoach } from '../auth/guards.js';
+import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
 
 const INVITE_TTL_DAYS = 7;
 
@@ -118,6 +119,39 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
         startedAt: link.startedAt,
         profile: link.client.clientProfile,
       };
+    },
+  );
+
+  // Recent workouts logged by one of the coach's clients.
+  fastify.get<{ Params: { id: string } }>(
+    '/coach/clients/:id/workouts',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const link = await prisma.coachClient.findUnique({
+        where: { coachId_clientId: { coachId: auth.userId, clientId: request.params.id } },
+        select: { id: true },
+      });
+      if (!link) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const workouts = await prisma.workoutLog.findMany({
+        where: { clientId: request.params.id },
+        orderBy: { date: 'desc' },
+        take: 30,
+        include: {
+          setLogs: {
+            include: {
+              programExercise: {
+                include: { programDay: { select: { title: true, order: true } } },
+              },
+            },
+          },
+        },
+      });
+      return workouts.map((w) => summarizeWorkout(w as WorkoutWithSets));
     },
   );
 
