@@ -135,7 +135,7 @@ export function App() {
       <Centered>
         <div className="text-center max-w-xs flex flex-col gap-5">
           <div className="flex flex-col items-center gap-3">
-            <Logo height={92} className="text-brand-text" />
+            <Logo height={64} />
             <p className="text-brand-muted text-sm">
               Твой тренер и весь прогресс — в одном приложении. Тренер ведёт
               подопечных, ты тренируешься, следишь за питанием и результатом.

@@ -95,6 +95,18 @@ h2 {
   border: 1px solid var(--line);
 }
 
+/* Master logo (black-on-transparent PNG): white on dark, black on light. */
+.jf-logo {
+  display: block;
+}
+:root[data-theme='dark'] .jf-logo,
+:root:not([data-theme]) .jf-logo {
+  filter: invert(1) brightness(1.06);
+}
+:root[data-theme='light'] .jf-logo {
+  filter: none;
+}
+
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
