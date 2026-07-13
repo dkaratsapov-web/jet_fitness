@@ -13,7 +13,7 @@ import { prisma } from '@jet/db';
 import { env } from '../env.js';
 import { requireCoach } from '../auth/guards.js';
 import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
-import { listProgress } from './client.js';
+import { listProgress, listCheckins } from './client.js';
 
 const INVITE_TTL_DAYS = 7;
 
@@ -172,6 +172,61 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
         return;
       }
       return listProgress(request.params.id);
+    },
+  );
+
+  // A client's check-ins.
+  fastify.get<{ Params: { id: string } }>(
+    '/coach/clients/:id/checkins',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const link = await prisma.coachClient.findUnique({
+        where: { coachId_clientId: { coachId: auth.userId, clientId: request.params.id } },
+        select: { id: true },
+      });
+      if (!link) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      return listCheckins(request.params.id);
+    },
+  );
+
+  // Reply to a client's check-in (must be the client's coach).
+  fastify.post<{ Params: { id: string }; Body: { reply: string } }>(
+    '/coach/checkins/:id/reply',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const text = request.body?.reply?.trim();
+      if (!text) {
+        reply.code(400).send({ error: 'bad_request', reason: 'reply_required' });
+        return;
+      }
+      const checkin = await prisma.checkin.findUnique({
+        where: { id: request.params.id },
+        select: { clientId: true },
+      });
+      if (!checkin) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const link = await prisma.coachClient.findUnique({
+        where: { coachId_clientId: { coachId: auth.userId, clientId: checkin.clientId } },
+        select: { id: true },
+      });
+      if (!link) {
+        reply.code(403).send({ error: 'forbidden', reason: 'not_your_client' });
+        return;
+      }
+      await prisma.checkin.update({
+        where: { id: request.params.id },
+        data: { coachReply: text, coachRepliedAt: new Date() },
+      });
+      return { ok: true };
     },
   );
 

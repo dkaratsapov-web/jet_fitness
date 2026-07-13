@@ -175,6 +175,28 @@ export interface ProgressInput {
   measurements?: Record<string, number> | null;
 }
 
+export interface Checkin {
+  id: string;
+  date: string;
+  weightKg: number | null;
+  sleepQuality: number | null;
+  energy: number | null;
+  adherencePct: number | null;
+  mood: number | null;
+  comment: string | null;
+  coachReply: string | null;
+  coachRepliedAt: string | null;
+}
+
+export interface CheckinInput {
+  weightKg?: number | null;
+  sleepQuality?: number | null;
+  energy?: number | null;
+  adherencePct?: number | null;
+  mood?: number | null;
+  comment?: string | null;
+}
+
 export const api = {
   session: () => request<SessionResponse>('/api/auth/session', { method: 'POST' }),
   me: () => request<SessionResponse>('/api/me'),
@@ -214,6 +236,13 @@ export const api = {
     request<WorkoutSummary[]>(`/api/coach/clients/${clientId}/workouts`),
   coachClientProgress: (clientId: string) =>
     request<ProgressEntry[]>(`/api/coach/clients/${clientId}/progress`),
+  coachClientCheckins: (clientId: string) =>
+    request<Checkin[]>(`/api/coach/clients/${clientId}/checkins`),
+  replyCheckin: (checkinId: string, reply: string) =>
+    request<{ ok: boolean }>(`/api/coach/checkins/${checkinId}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ reply }),
+    }),
 
   // Client (Phase 1)
   clientProgram: () => request<{ program: ClientProgram | null }>('/api/client/program'),
@@ -229,4 +258,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
   clientProgress: () => request<ProgressEntry[]>('/api/client/progress'),
+  addCheckin: (body: CheckinInput) =>
+    request<{ ok: boolean; id: string }>('/api/client/checkins', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  clientCheckins: () => request<Checkin[]>('/api/client/checkins'),
 };

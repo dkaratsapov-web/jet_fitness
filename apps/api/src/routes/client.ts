@@ -209,7 +209,74 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
     const auth = request.auth!;
     return listProgress(auth.userId);
   });
+
+  // ── Check-ins: periodic self-report to the coach ────────────────
+  fastify.post<{
+    Body: {
+      weightKg?: number | null;
+      sleepQuality?: number | null;
+      energy?: number | null;
+      adherencePct?: number | null;
+      mood?: number | null;
+      comment?: string | null;
+    };
+  }>('/client/checkins', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    const auth = request.auth!;
+    const b = request.body ?? {};
+    const clamp = (v: number | null | undefined, lo: number, hi: number) =>
+      v == null ? null : Math.min(hi, Math.max(lo, Math.round(v)));
+    const hasAny =
+      b.weightKg != null ||
+      b.sleepQuality != null ||
+      b.energy != null ||
+      b.adherencePct != null ||
+      b.mood != null ||
+      (b.comment && b.comment.trim().length > 0);
+    if (!hasAny) {
+      reply.code(400).send({ error: 'bad_request', reason: 'empty_checkin' });
+      return;
+    }
+    const checkin = await prisma.checkin.create({
+      data: {
+        clientId: auth.userId,
+        weightKg: b.weightKg ?? null,
+        sleepQuality: clamp(b.sleepQuality, 1, 5),
+        energy: clamp(b.energy, 1, 5),
+        adherencePct: clamp(b.adherencePct, 0, 100),
+        mood: clamp(b.mood, 1, 5),
+        comment: b.comment?.trim() || null,
+      },
+      select: { id: true },
+    });
+    return { ok: true, id: checkin.id };
+  });
+
+  fastify.get('/client/checkins', { preHandler: fastify.requireAuth }, async (request) => {
+    const auth = request.auth!;
+    return listCheckins(auth.userId);
+  });
 };
+
+/** Shared: a client's check-ins, newest first. */
+export async function listCheckins(clientId: string) {
+  const rows = await prisma.checkin.findMany({
+    where: { clientId },
+    orderBy: { date: 'desc' },
+    take: 30,
+  });
+  return rows.map((c) => ({
+    id: c.id,
+    date: c.date,
+    weightKg: c.weightKg,
+    sleepQuality: c.sleepQuality,
+    energy: c.energy,
+    adherencePct: c.adherencePct,
+    mood: c.mood,
+    comment: c.comment,
+    coachReply: c.coachReply,
+    coachRepliedAt: c.coachRepliedAt,
+  }));
+}
 
 /** Shared: a client's progress entries, newest first. */
 export async function listProgress(clientId: string) {

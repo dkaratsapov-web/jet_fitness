@@ -391,6 +391,25 @@ model ProgressPhoto {
   @@index([clientId, date])
 }
 
+// Periodic client self-report (spec §7.x). 1–5 scales + free comment; the
+// coach can reply. clientId is a User id (same convention as WorkoutLog).
+model Checkin {
+  id             String    @id @default(cuid())
+  clientId       String
+  date           DateTime  @default(now())
+  weightKg       Float?
+  sleepQuality   Int?      // 1–5
+  energy         Int?      // 1–5
+  adherencePct   Int?      // 0–100, how well the plan was followed
+  mood           Int?      // 1–5
+  comment        String?
+  coachReply     String?
+  coachRepliedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([clientId, date])
+}
+
 // ─────────────────────────────────────────────────────────────
 // Health module (spec §6.6 / §7.6 / §7.7 / §10) — SENSITIVE.
 // Gated behind HEALTH_MODULE_ENABLED. Sensitive fields/files are

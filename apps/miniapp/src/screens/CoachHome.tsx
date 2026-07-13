@@ -7,6 +7,7 @@ import {
   type Invite,
   type WorkoutSummary,
   type ProgressEntry,
+  type Checkin,
 } from '../api';
 import { CoachPrograms } from './CoachPrograms';
 
@@ -166,6 +167,14 @@ function ClientRow({ client }: { client: CoachClient }) {
   const [open, setOpen] = useState(false);
   const [workouts, setWorkouts] = useState<WorkoutSummary[] | null>(null);
   const [progress, setProgress] = useState<ProgressEntry[] | null>(null);
+  const [checkins, setCheckins] = useState<Checkin[] | null>(null);
+
+  function loadCheckins() {
+    api
+      .coachClientCheckins(client.id)
+      .then(setCheckins)
+      .catch(() => setCheckins([]));
+  }
 
   function toggle() {
     const next = !open;
@@ -179,6 +188,7 @@ function ClientRow({ client }: { client: CoachClient }) {
         .coachClientProgress(client.id)
         .then(setProgress)
         .catch(() => setProgress([]));
+      loadCheckins();
     }
   }
 
@@ -250,6 +260,82 @@ function ClientRow({ client }: { client: CoachClient }) {
               ))}
             </ul>
           )}
+
+          <div className="text-tg-hint text-xs font-medium mt-1">Check-in</div>
+          {checkins === null ? (
+            <p className="text-tg-hint text-xs">Загрузка…</p>
+          ) : checkins.length === 0 ? (
+            <p className="text-tg-hint text-xs">Пока нет отчётов.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {checkins.map((c) => (
+                <CheckinCard key={c.id} checkin={c} onReplied={loadCheckins} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function CheckinCard({ checkin, onReplied }: { checkin: Checkin; onReplied: () => void }) {
+  const [reply, setReply] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function send() {
+    if (!reply.trim()) return;
+    setBusy(true);
+    try {
+      await api.replyCheckin(checkin.id, reply.trim());
+      onReplied();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const stats = [
+    checkin.sleepQuality && `сон ${checkin.sleepQuality}/5`,
+    checkin.energy && `энергия ${checkin.energy}/5`,
+    checkin.mood && `настрой ${checkin.mood}/5`,
+    checkin.adherencePct != null && `план ${checkin.adherencePct}%`,
+    checkin.weightKg != null && `${checkin.weightKg} кг`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <li className="rounded-xl bg-tg-bg p-2 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-tg-hint text-xs">
+          {new Date(checkin.date).toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'short',
+          })}
+        </span>
+        <span className="text-tg-hint text-[11px]">{stats}</span>
+      </div>
+      {checkin.comment && <p className="text-sm">{checkin.comment}</p>}
+      {checkin.coachReply ? (
+        <div className="rounded-lg bg-tg-secondaryBg p-2">
+          <div className="text-tg-hint text-[10px] uppercase tracking-wide mb-1">Ваш ответ</div>
+          <p className="text-sm">{checkin.coachReply}</p>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <input
+            className="flex-1 rounded-lg bg-tg-secondaryBg p-2 text-sm outline-none"
+            placeholder="Ответить клиенту…"
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+          />
+          <button
+            className="rounded-lg bg-tg-button text-tg-buttonText px-3 text-sm disabled:opacity-60"
+            onClick={send}
+            disabled={busy || !reply.trim()}
+          >
+            {busy ? '…' : 'OK'}
+          </button>
         </div>
       )}
     </li>
