@@ -41,6 +41,24 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     trustProxy: true,
   });
 
+  // Tolerate empty JSON bodies (the Mini App sends POST /auth/session with an
+  // application/json header but no body). Default parser 400s on empty input.
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (_req, body: string, done) => {
+      if (!body || body.trim().length === 0) {
+        done(null, {});
+        return;
+      }
+      try {
+        done(null, JSON.parse(body));
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
+
   const allowAllOrigins = env.corsOrigins.includes('*') || env.corsOrigins.length === 0;
   await app.register(cors, {
     origin: allowAllOrigins ? true : env.corsOrigins,

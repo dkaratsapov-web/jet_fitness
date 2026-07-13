@@ -116,6 +116,9 @@ jobs:
           curl -s -m 25 -w "\n-> HTTP %{http_code}\n" "$API_GATEWAY_URL/health" || true
           echo "== GET /api/me (expect 401) =="
           curl -s -m 25 -w "\n-> HTTP %{http_code}\n" "$API_GATEWAY_URL/api/me" || true
+          echo "== POST /api/auth/session, empty body (expect 401, not 400) =="
+          curl -s -m 25 -X POST -H "content-type: application/json" \
+            -w "\n-> HTTP %{http_code}\n" "$API_GATEWAY_URL/api/auth/session" || true
 
       # ── 3. Mini App static -> Object Storage ────────────────
       - name: Build Mini App
