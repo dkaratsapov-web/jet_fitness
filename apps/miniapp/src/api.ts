@@ -223,6 +223,15 @@ export interface NutritionWeek {
   loggedDays: number;
 }
 
+export interface NutritionStats {
+  days: Array<{ date: string; kcal: number; protein: number; fat: number; carbs: number }>;
+  averages: Macros;
+  loggedDays: number;
+  totalDays: number;
+  adherencePct: number;
+  insights: string[];
+}
+
 export interface FoodSearchItem {
   id: string;
   name: string;
@@ -591,12 +600,15 @@ export const api = {
   nutritionDay: (date?: string) =>
     request<NutritionDay>(`/api/client/nutrition/day${date ? `?date=${date}` : ''}`),
   nutritionWeek: () => request<NutritionWeek>('/api/client/nutrition/week'),
+  nutritionStats: (days = 30) =>
+    request<NutritionStats>(`/api/client/nutrition/stats?days=${days}`),
   addMeal: (body: {
     mealType: MealType;
     grams: number;
     name?: string;
     foodItemId?: string;
     per100?: Macros;
+    date?: string;
   }) =>
     request<{ ok: boolean; id: string }>('/api/client/nutrition/meals', {
       method: 'POST',

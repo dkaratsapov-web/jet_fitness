@@ -78,6 +78,57 @@ async function daySummary(clientId: string, dateStr?: string) {
   };
 }
 
+// Turn nutrition stats into short Russian conclusions the client can act on.
+function buildInsights(x: {
+  target: { kcal: number; protein: number; fat: number; carbs: number } | null;
+  logged: number;
+  averages: { kcal: number; protein: number; fat: number; carbs: number };
+  adherencePct: number;
+  days: Array<{ kcal: number }>;
+}): string[] {
+  const out: string[] = [];
+  if (x.logged < 3) {
+    out.push('Мало данных — веди дневник хотя бы 3–4 дня, и появятся выводы.');
+    return out;
+  }
+  if (!x.target) {
+    out.push('Задай цель КБЖУ (её ставит тренер) — тогда будет видно, насколько ты в цели.');
+  } else {
+    if (x.adherencePct >= 70) {
+      out.push(`Отлично держишь калораж — ${x.adherencePct}% дней в пределах цели.`);
+    } else if (x.adherencePct >= 40) {
+      out.push(`Калории скачут — только ${x.adherencePct}% дней в цели. Старайся ровнее.`);
+    } else {
+      out.push(`Калораж часто мимо цели (${x.adherencePct}% дней в норме).`);
+    }
+    if (x.target.protein) {
+      if (x.averages.protein < x.target.protein * 0.85) {
+        out.push(
+          `Белка не хватает: в среднем ${x.averages.protein} из ${x.target.protein} г. Добавь белковые продукты.`,
+        );
+      } else if (x.averages.protein >= x.target.protein * 0.95) {
+        out.push(`Белок в норме — в среднем ${x.averages.protein} г в день.`);
+      }
+    }
+  }
+  // Trend: first vs second half of the logged range.
+  const logged = x.days.filter((d) => d.kcal > 0).map((d) => d.kcal);
+  if (logged.length >= 6) {
+    const half = Math.floor(logged.length / 2);
+    const first = logged.slice(0, half).reduce((s, v) => s + v, 0) / half;
+    const second = logged.slice(half).reduce((s, v) => s + v, 0) / (logged.length - half);
+    const diff = Math.round(second - first);
+    if (Math.abs(diff) >= 150) {
+      out.push(
+        diff < 0
+          ? `Калораж снижается — в среднем на ${Math.abs(diff)} ккал за период.`
+          : `Калораж растёт — в среднем на ${diff} ккал за период.`,
+      );
+    }
+  }
+  return out;
+}
+
 export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
   // ── Client: target & day summary ────────────────────────────────
   fastify.get('/client/nutrition/target', { preHandler: fastify.requireAuth }, async (request) => {
@@ -131,6 +182,62 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
     };
   });
 
+  // Stats over N days: per-day series, averages, adherence + auto insights.
+  fastify.get<{ Querystring: { days?: string } }>(
+    '/client/nutrition/stats',
+    { preHandler: fastify.requireAuth },
+    async (request) => {
+      const clientId = request.auth!.userId;
+      const target = await currentTarget(clientId);
+      const n = Math.min(90, Math.max(7, Number(request.query.days) || 30));
+      const now = new Date();
+      const days: Array<{ date: string; kcal: number; protein: number; fat: number; carbs: number }> = [];
+      for (let i = n - 1; i >= 0; i -= 1) {
+        const d = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - i * 86400000,
+        );
+        const { start, end } = dayRange(d.toISOString().slice(0, 10));
+        const meals = await prisma.mealLog.findMany({
+          where: { clientId, date: { gte: start, lt: end } },
+          select: { kcal: true, protein: true, fat: true, carbs: true },
+        });
+        const sum = meals.reduce(
+          (a, m) => ({
+            kcal: a.kcal + m.kcal,
+            protein: a.protein + m.protein,
+            fat: a.fat + m.fat,
+            carbs: a.carbs + m.carbs,
+          }),
+          { kcal: 0, protein: 0, fat: 0, carbs: 0 },
+        );
+        days.push({
+          date: start.toISOString().slice(0, 10),
+          kcal: Math.round(sum.kcal),
+          protein: Math.round(sum.protein),
+          fat: Math.round(sum.fat),
+          carbs: Math.round(sum.carbs),
+        });
+      }
+
+      const logged = days.filter((d) => d.kcal > 0);
+      const avg = (k: 'kcal' | 'protein' | 'fat' | 'carbs') =>
+        logged.length ? Math.round(logged.reduce((s, d) => s + d[k], 0) / logged.length) : 0;
+      const averages = { kcal: avg('kcal'), protein: avg('protein'), fat: avg('fat'), carbs: avg('carbs') };
+
+      // Days whose kcal fell within ±10% of the goal.
+      let inGoal = 0;
+      if (target?.kcal) {
+        const lo = target.kcal * 0.9;
+        const hi = target.kcal * 1.1;
+        inGoal = logged.filter((d) => d.kcal >= lo && d.kcal <= hi).length;
+      }
+      const adherencePct = logged.length ? Math.round((inGoal / logged.length) * 100) : 0;
+
+      const insights = buildInsights({ target, logged: logged.length, averages, adherencePct, days });
+      return { days, averages, loggedDays: logged.length, totalDays: n, adherencePct, insights };
+    },
+  );
+
   // ── Client: log a meal ──────────────────────────────────────────
   fastify.post<{
     Body: {
@@ -139,12 +246,17 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
       name?: string;
       foodItemId?: string;
       per100?: Partial<Macros>;
+      date?: string;
     };
   }>('/client/nutrition/meals', { preHandler: fastify.requireAuth }, async (request, reply) => {
     const auth = request.auth!;
     const b = request.body ?? {};
     const mealType = (b.mealType ?? 'snack') as MealType;
     const grams = Number(b.grams);
+    // Log to the selected day (noon UTC keeps it inside the day range); today by default.
+    const mealDate = /^\d{4}-\d{2}-\d{2}$/.test(b.date ?? '')
+      ? new Date(`${b.date}T12:00:00.000Z`)
+      : new Date();
     if (!MEAL_TYPES.includes(mealType) || !grams || grams <= 0) {
       reply.code(400).send({ error: 'bad_request', reason: 'invalid_meal' });
       return;
@@ -189,7 +301,7 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
     const meal = await prisma.mealLog.create({
       data: {
         clientId: auth.userId,
-        date: new Date(),
+        date: mealDate,
         mealType,
         foodItemId,
         grams,
