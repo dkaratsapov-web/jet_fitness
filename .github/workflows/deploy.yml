@@ -28,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TELEGRAM_API_ROOT: ${{ secrets.TELEGRAM_API_ROOT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -146,3 +147,17 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: infra/cloudflare-worker
           command: deploy --var YANDEX_GATEWAY_URL:${{ secrets.API_GATEWAY_URL }}
+
+      # ── 5. Point Telegram's webhook at the relay ────────────
+      # Runner can reach api.telegram.org; the relay forwards updates to Yandex.
+      - name: Set Telegram webhook
+        if: ${{ env.TELEGRAM_API_ROOT != '' }}
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          BOT_WEBHOOK_SECRET: ${{ secrets.BOT_WEBHOOK_SECRET }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" \
+            --data-urlencode "url=${TELEGRAM_API_ROOT}/webhook" \
+            --data-urlencode "secret_token=${BOT_WEBHOOK_SECRET}" \
+            --data-urlencode "drop_pending_updates=true" \
+            -w "\n-> HTTP %{http_code}\n"
