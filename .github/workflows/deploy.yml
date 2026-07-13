@@ -74,6 +74,10 @@ jobs:
           # function's service account must have ai.vision.user +
           # ai.languageModels.user. Falls back to YC_FOLDER_ID when set.
           YANDEX_FOLDER_ID: ${{ secrets.YANDEX_FOLDER_ID }}
+          # Runtime service account for the function (its metadata IAM token is
+          # used for Vision OCR + YandexGPT). Must hold ai.vision.user +
+          # ai.languageModels.user.
+          YC_FUNCTION_SA_ID: ${{ secrets.YC_FUNCTION_SA_ID }}
           # FatSecret nutrition API (optional). When set, food search uses it
           # first. Requires whitelisting this function's egress IP in FatSecret.
           FATSECRET_CLIENT_ID: ${{ secrets.FATSECRET_CLIENT_ID }}
@@ -128,12 +132,26 @@ jobs:
             [ -n "${FATSECRET_LANGUAGE:-}" ] && EXTRA+=(--environment "FATSECRET_LANGUAGE=$FATSECRET_LANGUAGE")
           fi
 
+          # Assign the runtime service account (its metadata IAM token is used
+          # for Vision OCR + YandexGPT). Prefer the explicit secret; otherwise
+          # reuse the deploy SA itself (jet-fitness-sa) — its id is in the key.
+          FUNC_SA_ID="${YC_FUNCTION_SA_ID:-}"
+          if [ -z "$FUNC_SA_ID" ] && [ -f /tmp/sa.json ]; then
+            FUNC_SA_ID=$(python3 -c "import json;print(json.load(open('/tmp/sa.json')).get('service_account_id',''))" 2>/dev/null || true)
+          fi
+          SA_ARGS=()
+          if [ -n "$FUNC_SA_ID" ]; then
+            SA_ARGS+=(--service-account-id "$FUNC_SA_ID")
+            echo "function runtime SA: $FUNC_SA_ID"
+          fi
+
           yc serverless function version create \
             --function-name jet-fitness-api \
             --runtime nodejs18 \
             --entrypoint handler.handler \
             --memory 512m \
-            --execution-timeout 30s \
+            --execution-timeout 60s \
+            "${SA_ARGS[@]}" \
             --package-bucket-name "$S3_UPLOADS_BUCKET" \
             --package-object-name "deploy/function.zip" \
             --environment "NODE_ENV=production" \

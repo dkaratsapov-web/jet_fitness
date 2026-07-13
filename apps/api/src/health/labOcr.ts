@@ -92,8 +92,9 @@ async function recognizeText(base64: string, mime: string): Promise<string | nul
   const operationId: string | undefined = submit?.id;
   if (!operationId) return null;
 
-  // Poll the operation for up to ~24s.
-  for (let i = 0; i < 12; i += 1) {
+  // Poll the operation for up to ~16s (kept well under the gateway timeout;
+  // single-page files usually finish in the first few polls).
+  for (let i = 0; i < 8; i += 1) {
     await new Promise((r) => setTimeout(r, 2000));
     const done = await fetchJson(
       `${OCR_RESULT_URL}?operationId=${encodeURIComponent(operationId)}`,
@@ -166,7 +167,7 @@ async function structureMarkers(ocrText: string): Promise<LabMarker[]> {
         ],
       }),
     },
-    20000,
+    12000,
   );
   const text: string | undefined = json?.result?.alternatives?.[0]?.message?.text;
   return text ? extractJsonArray(text) : [];
