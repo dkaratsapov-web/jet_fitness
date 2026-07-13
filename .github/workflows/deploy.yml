@@ -146,6 +146,10 @@ jobs:
           curl -fsSL --max-time 30 \
             "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260713_220341_65918d8c-f4e0-4486-b1a8-df21cc2b34a2.png" \
             -o apps/miniapp/public/brand/app-bg.png && echo "background fetched" || echo "background fetch skipped"
+          # Bot welcome hero image (sent by the bot on /start).
+          curl -fsSL --max-time 30 \
+            "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260713_221925_8c593efa-629c-4cc8-88dd-71dcc3477508.png" \
+            -o apps/miniapp/public/brand/welcome.png && echo "welcome fetched" || echo "welcome fetch skipped"
 
       - name: Build Mini App
         run: npm run build --workspace @jet/miniapp
@@ -189,8 +193,20 @@ jobs:
           # Command menu shown in the Telegram "/" picker.
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setMyCommands" \
             -H 'Content-Type: application/json' \
-            -d '{"commands":[{"command":"start","description":"Начать / принять приглашение"},{"command":"app","description":"Открыть приложение"},{"command":"help","description":"Справка"}]}' \
+            -d '{"commands":[{"command":"start","description":"Запустить Jet Fitness ✈️"},{"command":"app","description":"Открыть приложение"},{"command":"help","description":"Что умеет бот"}]}' \
             -w "\n-> setMyCommands HTTP %{http_code}\n"
+
+          # Bot profile description (shown on the empty-chat screen).
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setMyDescription" \
+            -H 'Content-Type: application/json' \
+            -d '{"description":"Jet Fitness ✈️ — премиальный фитнес-коучинг в твоём телефоне. Личные программы, техника упражнений с видео, питание и КБЖУ, прогресс и прямая связь с тренером. Тренируйся как в лучших клубах — где угодно. Жми «Запустить»."}' \
+            -w "\n-> setMyDescription HTTP %{http_code}\n"
+
+          # Short description (bot profile / search card).
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setMyShortDescription" \
+            -H 'Content-Type: application/json' \
+            -d '{"short_description":"Премиальный фитнес-коучинг в Telegram: программы, техника, питание и твой тренер рядом. ✈️"}' \
+            -w "\n-> setMyShortDescription HTTP %{http_code}\n"
 
           # Chat menu button opens the Mini App directly.
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setChatMenuButton" \

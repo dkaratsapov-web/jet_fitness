@@ -29,51 +29,60 @@ export function createBot(): Bot {
     const payload = ctx.match?.toString().trim() || undefined;
     const parsed = parseStartParam(payload);
 
+    const name = from.first_name ?? 'чемпион';
+
     if (parsed?.kind === 'invite') {
       const result = await acceptInvite(from.id, parsed.token);
       switch (result.status) {
         case 'bound':
-          await ctx.reply(
-            `Готово! Вы привязаны к тренеру. Откройте приложение, чтобы начать.`,
-            { reply_markup: miniAppKeyboard() },
+          await sendWelcome(
+            ctx,
+            `Готово, ${name} — ты в команде своего тренера. ✈️\n\n` +
+              `Открывай приложение: тебя уже ждёт программа, техника и питание. Погнали.`,
           );
           return;
         case 'already':
-          await ctx.reply(`Вы уже работаете с этим тренером. Откройте приложение.`, {
-            reply_markup: miniAppKeyboard(),
-          });
+          await ctx.reply(
+            `Ты уже тренируешься с этим тренером. Открывай приложение — продолжаем работу. ✈️`,
+            { reply_markup: miniAppKeyboard() },
+          );
           return;
         case 'expired':
-          await ctx.reply(`Ссылка-приглашение недействительна или устарела. Попросите тренера прислать новую.`);
+          await ctx.reply(`Ссылка-приглашение недействительна или устарела. Попроси тренера прислать новую.`);
           return;
         case 'self':
-          await ctx.reply(`Нельзя принять собственное приглашение.`);
+          await ctx.reply(`Нельзя принять собственное приглашение 🙂`);
           return;
         case 'not_found':
-          await ctx.reply(`Приглашение не найдено. Попросите тренера прислать новую ссылку.`);
+          await ctx.reply(`Приглашение не найдено. Попроси тренера прислать новую ссылку.`);
           return;
       }
     }
 
-    await ctx.reply(
-      `Привет, ${from.first_name ?? 'друг'}! Это фитнес-приложение «тренер ↔ подопечный».\n\n` +
-        `Откройте приложение кнопкой ниже. Тренеры ведут клиентов, клиенты — тренируются, ` +
-        `логируют питание и прогресс прямо в Telegram.`,
-      { reply_markup: miniAppKeyboard() },
+    await sendWelcome(
+      ctx,
+      `${name}, добро пожаловать в Jet Fitness ✈️\n\n` +
+        `Твой тренер и вся система тренировок — в одном месте:\n` +
+        `• персональные программы и техника упражнений с видео\n` +
+        `• питание и КБЖУ без занудства\n` +
+        `• прогресс, замеры и связь с тренером напрямую\n\n` +
+        `Жми кнопку — и полетели.`,
     );
   });
 
   bot.command('app', async (ctx) => {
     await upsertUserFromContext(ctx);
-    await ctx.reply('Открыть приложение:', { reply_markup: miniAppKeyboard() });
+    await ctx.reply('Твой Jet Fitness ждёт 👇', { reply_markup: miniAppKeyboard() });
   });
 
   bot.command('help', async (ctx) => {
     await ctx.reply(
-      `Команды:\n` +
-        `/start — начать / принять приглашение\n` +
+      `Jet Fitness ✈️\n\n` +
+        `/start — запустить приложение / принять приглашение\n` +
         `/app — открыть приложение\n` +
-        `/help — эта справка`,
+        `/help — эта справка\n\n` +
+        `Всё управление — внутри приложения: программы, техника с видео, питание, ` +
+        `прогресс и чат с тренером.`,
     );
   });
 
@@ -87,9 +96,31 @@ export function createBot(): Bot {
 function miniAppKeyboard(): InlineKeyboard {
   const kb = new InlineKeyboard();
   if (env.miniAppUrl) {
-    kb.webApp('Открыть приложение', env.miniAppUrl);
+    kb.webApp('Открыть Jet Fitness', env.miniAppUrl);
   }
   return kb;
+}
+
+// Premium welcome image, hosted next to the Mini App in Object Storage.
+function welcomePhotoUrl(): string | null {
+  if (!env.miniAppUrl) return null;
+  return env.miniAppUrl.replace(/index\.html$/, 'brand/welcome.png');
+}
+
+// Send the branded welcome: a hero photo with the message as its caption, and
+// the Mini App button. Falls back to a plain text message if the photo can't be
+// sent (asset missing, relay hiccup) — the greeting must never be lost.
+async function sendWelcome(ctx: Context, caption: string): Promise<void> {
+  const photo = welcomePhotoUrl();
+  if (photo) {
+    try {
+      await ctx.replyWithPhoto(photo, { caption, reply_markup: miniAppKeyboard() });
+      return;
+    } catch {
+      // fall through to text
+    }
+  }
+  await ctx.reply(caption, { reply_markup: miniAppKeyboard() });
 }
 
 async function upsertUserFromContext(ctx: Context): Promise<void> {
