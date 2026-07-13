@@ -362,6 +362,35 @@ export interface OwnerRevenue extends CoachRevenue {
   perCoach: Array<{ coachId: string; coachName: string; gross: number; commission: number }>;
 }
 
+export interface OwnerStats {
+  users: number;
+  coaches: number;
+  clients: number;
+  activeRelationships: number;
+  activeSubscriptions: number;
+  gmv: number;
+  workoutsLogged: number;
+  suspended: number;
+}
+
+export interface OwnerCoach {
+  id: string;
+  name: string;
+  suspended: boolean;
+  joinedAt: string;
+  clients: number;
+  revenue: number;
+}
+
+export interface OwnerClientRow {
+  id: string;
+  name: string;
+  suspended: boolean;
+  joinedAt: string;
+  goal: string | null;
+  coaches: number;
+}
+
 export const api = {
   session: () => request<SessionResponse>('/api/auth/session', { method: 'POST' }),
   me: () => request<SessionResponse>('/api/me'),
@@ -592,4 +621,12 @@ export const api = {
     }),
   coachRevenue: () => request<CoachRevenue>('/api/coach/revenue'),
   ownerRevenue: () => request<OwnerRevenue>('/api/owner/revenue'),
+  ownerStats: () => request<OwnerStats>('/api/owner/stats'),
+  ownerCoaches: () => request<OwnerCoach[]>('/api/owner/coaches'),
+  ownerClients: () => request<OwnerClientRow[]>('/api/owner/clients'),
+  suspendUser: (id: string, suspended: boolean) =>
+    request<{ ok: boolean; suspended: boolean }>(`/api/owner/users/${id}/suspend`, {
+      method: 'POST',
+      body: JSON.stringify({ suspended }),
+    }),
 };

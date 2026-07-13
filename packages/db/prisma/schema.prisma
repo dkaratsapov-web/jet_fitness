@@ -96,6 +96,8 @@ model User {
   username   String?
   firstName  String?
   timezone   String   @default("UTC")
+  // Platform moderation: a suspended user is blocked at auth (owner exempt).
+  suspended  Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

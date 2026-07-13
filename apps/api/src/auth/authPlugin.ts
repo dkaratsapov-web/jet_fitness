@@ -26,6 +26,7 @@ export interface AuthContext {
   isOwner: boolean;
   isCoach: boolean;
   isClient: boolean;
+  suspended: boolean;
   initData: ValidatedInitData;
 }
 
@@ -105,6 +106,7 @@ export async function resolveAuthContext(
     isOwner,
     isCoach,
     isClient,
+    suspended: user.suspended,
     initData: data,
   };
 }
@@ -131,7 +133,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
         return;
       }
 
-      request.auth = await resolveAuthContext(result.data);
+      const auth = await resolveAuthContext(result.data);
+      // Suspended accounts are blocked platform-wide (the owner is exempt).
+      if (auth.suspended && !auth.isOwner) {
+        reply.code(403).send({ error: 'forbidden', reason: 'account_suspended' });
+        return;
+      }
+      request.auth = auth;
     },
   );
 };
