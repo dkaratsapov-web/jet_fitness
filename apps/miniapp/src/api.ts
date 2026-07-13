@@ -161,6 +161,20 @@ export interface WorkoutSummary {
   totalVolume: number;
 }
 
+export interface ProgressEntry {
+  id: string;
+  date: string;
+  weightKg: number | null;
+  bodyFatPct: number | null;
+  measurements: Record<string, number> | null;
+}
+
+export interface ProgressInput {
+  weightKg?: number | null;
+  bodyFatPct?: number | null;
+  measurements?: Record<string, number> | null;
+}
+
 export const api = {
   session: () => request<SessionResponse>('/api/auth/session', { method: 'POST' }),
   me: () => request<SessionResponse>('/api/me'),
@@ -198,6 +212,8 @@ export const api = {
     }),
   coachClientWorkouts: (clientId: string) =>
     request<WorkoutSummary[]>(`/api/coach/clients/${clientId}/workouts`),
+  coachClientProgress: (clientId: string) =>
+    request<ProgressEntry[]>(`/api/coach/clients/${clientId}/progress`),
 
   // Client (Phase 1)
   clientProgram: () => request<{ program: ClientProgram | null }>('/api/client/program'),
@@ -207,4 +223,10 @@ export const api = {
       body: JSON.stringify({ programDayId, sets }),
     }),
   clientWorkouts: () => request<WorkoutSummary[]>('/api/client/workouts'),
+  addProgress: (body: ProgressInput) =>
+    request<{ ok: boolean; id: string }>('/api/client/progress', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  clientProgress: () => request<ProgressEntry[]>('/api/client/progress'),
 };

@@ -6,6 +6,7 @@ import {
   type CoachDashboard,
   type Invite,
   type WorkoutSummary,
+  type ProgressEntry,
 } from '../api';
 import { CoachPrograms } from './CoachPrograms';
 
@@ -164,6 +165,7 @@ function ClientsTab() {
 function ClientRow({ client }: { client: CoachClient }) {
   const [open, setOpen] = useState(false);
   const [workouts, setWorkouts] = useState<WorkoutSummary[] | null>(null);
+  const [progress, setProgress] = useState<ProgressEntry[] | null>(null);
 
   function toggle() {
     const next = !open;
@@ -173,8 +175,20 @@ function ClientRow({ client }: { client: CoachClient }) {
         .coachClientWorkouts(client.id)
         .then(setWorkouts)
         .catch(() => setWorkouts([]));
+      api
+        .coachClientProgress(client.id)
+        .then(setProgress)
+        .catch(() => setProgress([]));
     }
   }
+
+  const weights = (progress ?? []).filter((e) => e.weightKg != null);
+  const latestWeight = weights[0]?.weightKg ?? null;
+  const prevWeight = weights[1]?.weightKg ?? null;
+  const wDelta =
+    latestWeight != null && prevWeight != null
+      ? +(latestWeight - prevWeight).toFixed(1)
+      : null;
 
   return (
     <li className="rounded-2xl bg-tg-secondaryBg p-3">
@@ -194,7 +208,20 @@ function ClientRow({ client }: { client: CoachClient }) {
       </button>
 
       {open && (
-        <div className="mt-3 border-t border-tg-bg pt-3">
+        <div className="mt-3 border-t border-tg-bg pt-3 flex flex-col gap-3">
+          {latestWeight != null && (
+            <div className="flex items-baseline gap-2">
+              <span className="text-tg-hint text-xs">Вес:</span>
+              <span className="font-semibold">{latestWeight} кг</span>
+              {wDelta != null && wDelta !== 0 && (
+                <span className={`text-xs ${wDelta < 0 ? 'text-green-500' : 'text-red-400'}`}>
+                  {wDelta > 0 ? '+' : ''}
+                  {wDelta}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="text-tg-hint text-xs font-medium">Тренировки</div>
           {workouts === null ? (
             <p className="text-tg-hint text-xs">Загрузка…</p>
           ) : workouts.length === 0 ? (

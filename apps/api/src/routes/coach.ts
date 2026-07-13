@@ -13,6 +13,7 @@ import { prisma } from '@jet/db';
 import { env } from '../env.js';
 import { requireCoach } from '../auth/guards.js';
 import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
+import { listProgress } from './client.js';
 
 const INVITE_TTL_DAYS = 7;
 
@@ -152,6 +153,25 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
       return workouts.map((w) => summarizeWorkout(w as WorkoutWithSets));
+    },
+  );
+
+  // A client's progress entries (weight, body-fat, measurements).
+  fastify.get<{ Params: { id: string } }>(
+    '/coach/clients/:id/progress',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const link = await prisma.coachClient.findUnique({
+        where: { coachId_clientId: { coachId: auth.userId, clientId: request.params.id } },
+        select: { id: true },
+      });
+      if (!link) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      return listProgress(request.params.id);
     },
   );
 

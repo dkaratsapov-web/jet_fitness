@@ -172,4 +172,57 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
       return workouts.map((w) => summarizeWorkout(w as WorkoutWithSets));
     },
   );
+
+  // ── Progress: weight, body-fat, body measurements ───────────────
+  fastify.post<{
+    Body: {
+      date?: string;
+      weightKg?: number | null;
+      bodyFatPct?: number | null;
+      measurements?: Record<string, number> | null;
+    };
+  }>('/client/progress', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    const auth = request.auth!;
+    const { date, weightKg, bodyFatPct, measurements } = request.body ?? {};
+    const hasAny =
+      weightKg != null ||
+      bodyFatPct != null ||
+      (measurements && Object.keys(measurements).length > 0);
+    if (!hasAny) {
+      reply.code(400).send({ error: 'bad_request', reason: 'empty_entry' });
+      return;
+    }
+    const entry = await prisma.progressEntry.create({
+      data: {
+        clientId: auth.userId,
+        date: date ? new Date(date) : new Date(),
+        weightKg: weightKg ?? null,
+        bodyFatPct: bodyFatPct ?? null,
+        measurements: measurements ?? undefined,
+      },
+      select: { id: true },
+    });
+    return { ok: true, id: entry.id };
+  });
+
+  fastify.get('/client/progress', { preHandler: fastify.requireAuth }, async (request) => {
+    const auth = request.auth!;
+    return listProgress(auth.userId);
+  });
 };
+
+/** Shared: a client's progress entries, newest first. */
+export async function listProgress(clientId: string) {
+  const entries = await prisma.progressEntry.findMany({
+    where: { clientId },
+    orderBy: { date: 'desc' },
+    take: 60,
+  });
+  return entries.map((e) => ({
+    id: e.id,
+    date: e.date,
+    weightKg: e.weightKg,
+    bodyFatPct: e.bodyFatPct,
+    measurements: (e.measurements as Record<string, number> | null) ?? null,
+  }));
+}

@@ -7,6 +7,7 @@ import {
   type WorkoutSummary,
 } from '../api';
 import { WorkoutSession } from './WorkoutSession';
+import { ProgressScreen } from './ProgressScreen';
 
 // Client home (Phase 1): assigned program, run a workout, workout history.
 export function ClientHome({ session }: { session: SessionResponse }) {
@@ -14,6 +15,7 @@ export function ClientHome({ session }: { session: SessionResponse }) {
   const [program, setProgram] = useState<ClientProgram | null | undefined>(undefined);
   const [history, setHistory] = useState<WorkoutSummary[]>([]);
   const [active, setActive] = useState<{ day: ClientProgramDay; index: number } | null>(null);
+  const [view, setView] = useState<'home' | 'progress'>('home');
 
   function loadHistory() {
     api.clientWorkouts().then(setHistory).catch(() => setHistory([]));
@@ -41,6 +43,10 @@ export function ClientHome({ session }: { session: SessionResponse }) {
     );
   }
 
+  if (view === 'progress') {
+    return <ProgressScreen onBack={() => setView('home')} />;
+  }
+
   return (
     <div className="flex flex-col gap-4 p-4">
       <header>
@@ -62,7 +68,14 @@ export function ClientHome({ session }: { session: SessionResponse }) {
       {history.length > 0 && <History items={history} />}
 
       <div className="grid grid-cols-2 gap-3">
-        {['Питание', 'Прогресс', 'Check-in', 'Техника'].map((label) => (
+        <button
+          className="rounded-2xl bg-tg-secondaryBg p-4 text-center"
+          onClick={() => setView('progress')}
+        >
+          <div className="text-base font-medium">Прогресс</div>
+          <div className="text-tg-hint text-xs mt-1">вес · замеры</div>
+        </button>
+        {['Питание', 'Check-in', 'Техника'].map((label) => (
           <div
             key={label}
             className="rounded-2xl bg-tg-secondaryBg p-4 text-center opacity-60"
