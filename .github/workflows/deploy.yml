@@ -146,10 +146,6 @@ jobs:
           curl -fsSL --max-time 30 \
             "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260713_220341_65918d8c-f4e0-4486-b1a8-df21cc2b34a2.png" \
             -o apps/miniapp/public/brand/app-bg.png && echo "background fetched" || echo "background fetch skipped"
-          # Bot welcome hero image (sent by the bot on /start).
-          curl -fsSL --max-time 30 \
-            "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260713_221925_8c593efa-629c-4cc8-88dd-71dcc3477508.png" \
-            -o apps/miniapp/public/brand/welcome.png && echo "welcome fetched" || echo "welcome fetch skipped"
 
       - name: Build Mini App
         run: npm run build --workspace @jet/miniapp

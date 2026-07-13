@@ -35,10 +35,10 @@ export function createBot(): Bot {
       const result = await acceptInvite(from.id, parsed.token);
       switch (result.status) {
         case 'bound':
-          await sendWelcome(
-            ctx,
-            `Готово, ${name} — ты в команде своего тренера. ✈️\n\n` +
-              `Открывай приложение: тебя уже ждёт программа, техника и питание. Погнали.`,
+          await ctx.reply(
+            `${name}, добро пожаловать в команду. ✈️\n\n` +
+              `Твой тренер уже готовит программу — открывай приложение и знакомься.`,
+            { reply_markup: miniAppKeyboard() },
           );
           return;
         case 'already':
@@ -59,14 +59,11 @@ export function createBot(): Bot {
       }
     }
 
-    await sendWelcome(
-      ctx,
-      `${name}, добро пожаловать в Jet Fitness ✈️\n\n` +
-        `Твой тренер и вся система тренировок — в одном месте:\n` +
-        `• персональные программы и техника упражнений с видео\n` +
-        `• питание и КБЖУ без занудства\n` +
-        `• прогресс, замеры и связь с тренером напрямую\n\n` +
-        `Жми кнопку — и полетели.`,
+    await ctx.reply(
+      `С возвращением на борт, ${name}. ✈️\n\n` +
+        `Всё готово к работе — тренер, план и твои цели ждут внутри.\n` +
+        `Один тап по кнопке ниже, и начинаем. Погнали. 💪`,
+      { reply_markup: miniAppKeyboard() },
     );
   });
 
@@ -99,28 +96,6 @@ function miniAppKeyboard(): InlineKeyboard {
     kb.webApp('Открыть Jet Fitness', env.miniAppUrl);
   }
   return kb;
-}
-
-// Premium welcome image, hosted next to the Mini App in Object Storage.
-function welcomePhotoUrl(): string | null {
-  if (!env.miniAppUrl) return null;
-  return env.miniAppUrl.replace(/index\.html$/, 'brand/welcome.png');
-}
-
-// Send the branded welcome: a hero photo with the message as its caption, and
-// the Mini App button. Falls back to a plain text message if the photo can't be
-// sent (asset missing, relay hiccup) — the greeting must never be lost.
-async function sendWelcome(ctx: Context, caption: string): Promise<void> {
-  const photo = welcomePhotoUrl();
-  if (photo) {
-    try {
-      await ctx.replyWithPhoto(photo, { caption, reply_markup: miniAppKeyboard() });
-      return;
-    } catch {
-      // fall through to text
-    }
-  }
-  await ctx.reply(caption, { reply_markup: miniAppKeyboard() });
 }
 
 async function upsertUserFromContext(ctx: Context): Promise<void> {
