@@ -3,6 +3,7 @@ import { api, ApiError, type AppRole, type SessionResponse } from './api';
 import { getInitData } from './telegram';
 import { CoachHome } from './screens/CoachHome';
 import { ClientHome } from './screens/ClientHome';
+import { OwnerHome } from './screens/OwnerHome';
 import { RolePicker } from './screens/RolePicker';
 
 type State =
@@ -25,9 +26,8 @@ export function App() {
       .session()
       .then((session) => {
         setState({ phase: 'ready', session });
-        // Auto-select role when there is exactly one.
-        if (session.isCoach && !session.isClient) setActiveRole('coach');
-        else if (session.isClient && !session.isCoach) setActiveRole('client');
+        // Auto-select the role when the account has exactly one.
+        if (session.roles.length === 1) setActiveRole(session.roles[0]);
       })
       .catch((err: unknown) => {
         const message =
@@ -67,8 +67,8 @@ export function App() {
 
   const { session } = state;
 
-  // Account has neither role yet (fresh user without an invite).
-  if (!session.isCoach && !session.isClient) {
+  // Account has no role yet (fresh user without an invite).
+  if (session.roles.length === 0) {
     return (
       <Centered>
         <div className="text-center max-w-xs">
@@ -82,16 +82,19 @@ export function App() {
     );
   }
 
-  // Dual-role account: let the user choose.
+  // Multi-role account: let the user choose which context to enter.
   if (!activeRole) {
     return <RolePicker roles={session.roles} onPick={setActiveRole} />;
   }
 
-  return activeRole === 'coach' ? (
-    <CoachHome session={session} />
-  ) : (
-    <ClientHome session={session} />
-  );
+  switch (activeRole) {
+    case 'owner':
+      return <OwnerHome session={session} />;
+    case 'coach':
+      return <CoachHome session={session} />;
+    default:
+      return <ClientHome session={session} />;
+  }
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

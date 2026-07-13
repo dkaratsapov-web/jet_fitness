@@ -2,7 +2,9 @@
 // coach and a client; the active role is decided by login context, not stored
 // as a single fixed attribute on the user.
 
-export type AppRole = 'client' | 'coach' | 'admin';
+// 'owner' is the platform owner/operator (spec §2 admin): sees the whole
+// platform, distinct from coaches and clients.
+export type AppRole = 'client' | 'coach' | 'owner';
 
 export interface SessionUser {
   id: string;
@@ -15,6 +17,8 @@ export interface SessionUser {
 export interface SessionResponse {
   user: SessionUser;
   roles: AppRole[];
+  /** Platform owner/operator. */
+  isOwner: boolean;
   /** Whether this account has a coach profile. */
   isCoach: boolean;
   /** Whether this account has (or just became) a client of some coach. */

@@ -5,7 +5,7 @@ import { getInitData } from './telegram';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
-export type AppRole = 'client' | 'coach' | 'admin';
+export type AppRole = 'client' | 'coach' | 'owner';
 
 export interface SessionUser {
   id: string;
@@ -18,6 +18,7 @@ export interface SessionUser {
 export interface SessionResponse {
   user: SessionUser;
   roles: AppRole[];
+  isOwner: boolean;
   isCoach: boolean;
   isClient: boolean;
 }

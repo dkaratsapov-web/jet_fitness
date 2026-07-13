@@ -6,9 +6,11 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { parseStartParam, type SessionResponse, type AppRole } from '@jet/shared';
+import { env } from '../env.js';
 
 interface Roles {
   roles: AppRole[];
+  isOwner: boolean;
   isCoach: boolean;
   isClient: boolean;
 }
@@ -32,6 +34,7 @@ function toSessionResponse(
       timezone: user.timezone,
     },
     roles: roles.roles,
+    isOwner: roles.isOwner,
     isCoach: roles.isCoach,
     isClient: roles.isClient,
   };
@@ -125,13 +128,15 @@ async function resolveUserAndRoles(userId: string) {
   const clientRelations = await prisma.coachClient.count({
     where: { clientId: userId },
   });
+  const isOwner = env.ownerTelegramIds.includes(user.telegramId.toString());
   const isCoach = Boolean(user.coachProfile);
   const isClient = Boolean(user.clientProfile) || clientRelations > 0;
   const roles: AppRole[] = [];
+  if (isOwner) roles.push('owner');
   if (isCoach) roles.push('coach');
   if (isClient) roles.push('client');
   return {
     user,
-    roles: { roles, isCoach, isClient } satisfies Roles,
+    roles: { roles, isOwner, isCoach, isClient } satisfies Roles,
   };
 }
