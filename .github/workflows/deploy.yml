@@ -173,3 +173,15 @@ jobs:
             --data-urlencode "secret_token=${BOT_WEBHOOK_SECRET}" \
             --data-urlencode "drop_pending_updates=true" \
             -w "\n-> HTTP %{http_code}\n"
+
+          # Command menu shown in the Telegram "/" picker.
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setMyCommands" \
+            -H 'Content-Type: application/json' \
+            -d '{"commands":[{"command":"start","description":"Начать / принять приглашение"},{"command":"app","description":"Открыть приложение"},{"command":"help","description":"Справка"}]}' \
+            -w "\n-> setMyCommands HTTP %{http_code}\n"
+
+          # Chat menu button opens the Mini App directly.
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setChatMenuButton" \
+            -H 'Content-Type: application/json' \
+            -d '{"menu_button":{"type":"web_app","text":"Открыть","web_app":{"url":"https://storage.yandexcloud.net/jet-fitness-app/index.html"}}}' \
+            -w "\n-> setChatMenuButton HTTP %{http_code}\n"

@@ -77,13 +77,35 @@ function HealthContent({ onRevoked }: { onRevoked: () => void }) {
   }
   useEffect(load, []);
 
+  const [exporting, setExporting] = useState(false);
+
   async function revoke() {
     await api.revokeHealthConsent().catch(() => undefined);
     onRevoked();
   }
   async function wipe() {
+    if (!confirm('Удалить все данные о здоровье безвозвратно?')) return;
     await api.deleteAllHealth().catch(() => undefined);
     onRevoked();
+  }
+  // Export must go through the authenticated API client (a plain link would
+  // not carry the initData auth header), then download as a file.
+  async function exportData() {
+    setExporting(true);
+    try {
+      const data = await api.exportHealth();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'jet-fitness-health.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      /* best-effort */
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -93,14 +115,13 @@ function HealthContent({ onRevoked }: { onRevoked: () => void }) {
 
       <section className="rounded-2xl bg-tg-secondaryBg p-3 flex flex-col gap-2">
         <div className="text-tg-hint text-xs">Ваши данные</div>
-        <a
-          className="rounded-xl bg-tg-bg p-3 text-sm text-tg-link text-center"
-          href={`${(import.meta.env.VITE_API_URL as string) ?? ''}/api/client/health/export`}
-          target="_blank"
-          rel="noreferrer"
+        <button
+          className="rounded-xl bg-tg-bg p-3 text-sm text-tg-link text-center disabled:opacity-60"
+          onClick={exportData}
+          disabled={exporting}
         >
-          Выгрузить все данные (JSON)
-        </a>
+          {exporting ? 'Готовим файл…' : 'Выгрузить все данные (JSON)'}
+        </button>
         <button className="rounded-xl bg-tg-bg p-3 text-sm text-tg-hint" onClick={revoke}>
           Отозвать согласие (данные сохранятся)
         </button>

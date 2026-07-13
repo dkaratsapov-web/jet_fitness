@@ -557,6 +557,7 @@ export const api = {
     request<{ ok: boolean }>(`/api/client/health/supplements/${id}/intake`, { method: 'POST' }),
   deleteSupplement: (id: string) =>
     request<{ ok: boolean }>(`/api/client/health/supplements/${id}`, { method: 'DELETE' }),
+  exportHealth: () => request<unknown>('/api/client/health/export'),
   deleteAllHealth: () => request<{ ok: boolean }>('/api/client/health', { method: 'DELETE' }),
   uploadFormVideo: async (file: File) => {
     const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase();

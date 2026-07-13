@@ -9,6 +9,7 @@ import { RolePicker } from './screens/RolePicker';
 type State =
   | { phase: 'loading' }
   | { phase: 'no-telegram' }
+  | { phase: 'suspended' }
   | { phase: 'error'; message: string }
   | { phase: 'ready'; session: SessionResponse };
 
@@ -26,6 +27,10 @@ export function App() {
         return session;
       })
       .catch((err: unknown) => {
+        if (err instanceof ApiError && err.reason === 'account_suspended') {
+          setState({ phase: 'suspended' });
+          return;
+        }
         const message =
           err instanceof ApiError ? `${err.status}: ${err.reason}` : String(err);
         setState({ phase: 'error', message });
@@ -75,6 +80,21 @@ export function App() {
           <p className="text-tg-hint text-sm">
             Это приложение запускается внутри Telegram. Откройте его через бота
             командой /app.
+          </p>
+        </div>
+      </Centered>
+    );
+  }
+
+  if (state.phase === 'suspended') {
+    return (
+      <Centered>
+        <div className="text-center max-w-xs">
+          <div className="text-4xl mb-2">⛔️</div>
+          <h1 className="text-xl font-semibold mb-2">Доступ приостановлен</h1>
+          <p className="text-tg-hint text-sm">
+            Ваш аккаунт заблокирован администратором платформы. Если это ошибка,
+            свяжитесь со своим тренером или поддержкой.
           </p>
         </div>
       </Centered>
@@ -135,14 +155,29 @@ export function App() {
     return <RolePicker roles={session.roles} onPick={setActiveRole} />;
   }
 
-  switch (activeRole) {
-    case 'owner':
-      return <OwnerHome session={session} />;
-    case 'coach':
-      return <CoachHome session={session} />;
-    default:
-      return <ClientHome session={session} />;
-  }
+  const home =
+    activeRole === 'owner' ? (
+      <OwnerHome session={session} />
+    ) : activeRole === 'coach' ? (
+      <CoachHome session={session} />
+    ) : (
+      <ClientHome session={session} />
+    );
+
+  return (
+    <>
+      {home}
+      {session.roles.length > 1 && (
+        <button
+          className="fixed bottom-3 right-3 z-20 rounded-full bg-tg-secondaryBg/90 backdrop-blur px-3 py-1.5 text-xs text-tg-hint shadow"
+          onClick={() => setActiveRole(null)}
+          aria-label="Сменить роль"
+        >
+          ⇄ сменить роль
+        </button>
+      )}
+    </>
+  );
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
