@@ -12,6 +12,7 @@ import { ProgressScreen } from './ProgressScreen';
 import { CheckinScreen } from './CheckinScreen';
 import { TechniqueScreen } from './TechniqueScreen';
 import { NutritionScreen } from './NutritionScreen';
+import { HealthScreen } from './HealthScreen';
 import { OnboardingForm } from './OnboardingForm';
 import { LineChart } from '../components/LineChart';
 
@@ -23,9 +24,10 @@ export function ClientHome({ session }: { session: SessionResponse }) {
   const [challenges, setChallenges] = useState<ClientChallenge[]>([]);
   const [active, setActive] = useState<{ day: ClientProgramDay; index: number } | null>(null);
   const [view, setView] = useState<
-    'home' | 'progress' | 'checkin' | 'technique' | 'nutrition'
+    'home' | 'progress' | 'checkin' | 'technique' | 'nutrition' | 'health'
   >('home');
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [healthEnabled, setHealthEnabled] = useState(false);
 
   function loadHistory() {
     api.clientWorkouts().then(setHistory).catch(() => setHistory([]));
@@ -41,6 +43,7 @@ export function ClientHome({ session }: { session: SessionResponse }) {
       .then((p) => setNeedsOnboarding(!p.filled))
       .catch(() => setNeedsOnboarding(false));
     api.clientChallenges().then(setChallenges).catch(() => setChallenges([]));
+    api.healthStatus().then((s) => setHealthEnabled(s.moduleEnabled)).catch(() => setHealthEnabled(false));
     loadHistory();
   }, []);
 
@@ -72,6 +75,10 @@ export function ClientHome({ session }: { session: SessionResponse }) {
 
   if (view === 'nutrition') {
     return <NutritionScreen onBack={() => setView('home')} />;
+  }
+
+  if (view === 'health') {
+    return <HealthScreen onBack={() => setView('home')} />;
   }
 
   return (
@@ -127,6 +134,15 @@ export function ClientHome({ session }: { session: SessionResponse }) {
           <div className="text-base font-medium">Питание</div>
           <div className="text-tg-hint text-xs mt-1">калории · КБЖУ</div>
         </button>
+        {healthEnabled && (
+          <button
+            className="rounded-2xl bg-tg-secondaryBg p-4 text-center"
+            onClick={() => setView('health')}
+          >
+            <div className="text-base font-medium">Здоровье</div>
+            <div className="text-tg-hint text-xs mt-1">анализы · добавки</div>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -398,18 +398,21 @@ model ProgressPhoto {
 // encrypted at rest; access strictly limited to client + their coach.
 // ─────────────────────────────────────────────────────────────
 
-// SENSITIVE medical data (spec §10). Encrypt value/sourceFile at rest.
+// SENSITIVE medical data (spec §10). The measured value and the scanned-form
+// object key are AES-256-GCM encrypted at rest (see apps/api/src/health/crypto).
+// Marker name and reference ranges are non-identifying and kept in clear so the
+// server can group/label without decrypting.
 model LabResult {
-  id            String   @id @default(cuid())
-  clientId      String
-  date          DateTime
-  marker        String
-  value         Float
-  unit          String?
-  refLow        Float?
-  refHigh       Float?
-  sourceFileKey String?  // S3/MinIO object key for the scanned form
-  createdAt     DateTime @default(now())
+  id               String   @id @default(cuid())
+  clientId         String
+  date             DateTime
+  marker           String
+  valueEnc         String   // ciphertext of the numeric value
+  unit             String?
+  refLow           Float?
+  refHigh          Float?
+  sourceFileKeyEnc String?  // ciphertext of the S3/MinIO object key (scanned form)
+  createdAt        DateTime @default(now())
 
   @@index([clientId, date])
   @@index([marker])

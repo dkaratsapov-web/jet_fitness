@@ -37,6 +37,9 @@ export const env = {
     .filter(Boolean),
 
   healthModuleEnabled: optional('HEALTH_MODULE_ENABLED', 'false') === 'true',
+  // 32-byte key (hex or base64) for AES-256-GCM encryption of sensitive health
+  // fields. Required when the health module is enabled.
+  healthEncryptionKey: optional('HEALTH_ENCRYPTION_KEY', ''),
   platformFeePercent: Number(optional('PLATFORM_FEE_PERCENT', '10')),
 
   // If set, the API also serves the built Mini App static files from this

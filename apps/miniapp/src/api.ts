@@ -223,6 +223,30 @@ export interface FoodSearchItem {
   per100: Macros;
 }
 
+export interface HealthStatus {
+  moduleEnabled: boolean;
+  consentGiven: boolean;
+}
+
+export interface LabResult {
+  id: string;
+  date: string;
+  marker: string;
+  value: number;
+  unit: string | null;
+  refLow: number | null;
+  refHigh: number | null;
+}
+
+export interface Supplement {
+  id: string;
+  name: string;
+  dose: string | null;
+  schedule: unknown;
+  remindersOn: boolean;
+  takenToday: number;
+}
+
 export type ChallengeType = 'steps' | 'workouts' | 'weight' | 'custom';
 
 export interface LeaderRow {
@@ -470,6 +494,41 @@ export const api = {
   lookupBarcode: (code: string) =>
     request<{ food: FoodSearchItem }>(`/api/client/nutrition/foods/barcode/${code}`),
   clientChallenges: () => request<ClientChallenge[]>('/api/client/challenges'),
+
+  // Health module (Phase 3) — gated by HEALTH_MODULE_ENABLED + consent
+  healthStatus: () => request<HealthStatus>('/api/client/health/status'),
+  giveHealthConsent: () =>
+    request<{ ok: boolean }>('/api/client/health/consent', { method: 'POST' }),
+  revokeHealthConsent: () =>
+    request<{ ok: boolean }>('/api/client/health/consent', { method: 'DELETE' }),
+  labs: () => request<LabResult[]>('/api/client/health/labs'),
+  addLab: (body: {
+    marker: string;
+    value: number;
+    unit?: string;
+    date?: string;
+    refLow?: number;
+    refHigh?: number;
+  }) =>
+    request<{ ok: boolean; id: string }>('/api/client/health/labs', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  markerHistory: (marker: string) =>
+    request<LabResult[]>(`/api/client/health/labs/${encodeURIComponent(marker)}`),
+  deleteLab: (id: string) =>
+    request<{ ok: boolean }>(`/api/client/health/labs/${id}`, { method: 'DELETE' }),
+  supplements: () => request<Supplement[]>('/api/client/health/supplements'),
+  addSupplement: (body: { name: string; dose?: string; remindersOn?: boolean }) =>
+    request<{ ok: boolean; id: string }>('/api/client/health/supplements', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  markIntake: (id: string) =>
+    request<{ ok: boolean }>(`/api/client/health/supplements/${id}/intake`, { method: 'POST' }),
+  deleteSupplement: (id: string) =>
+    request<{ ok: boolean }>(`/api/client/health/supplements/${id}`, { method: 'DELETE' }),
+  deleteAllHealth: () => request<{ ok: boolean }>('/api/client/health', { method: 'DELETE' }),
   uploadFormVideo: async (file: File) => {
     const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase();
     const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(

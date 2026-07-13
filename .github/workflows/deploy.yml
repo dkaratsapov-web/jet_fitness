@@ -66,6 +66,10 @@ jobs:
           S3_KEY: ${{ secrets.S3_KEY }}
           S3_SECRET: ${{ secrets.S3_SECRET }}
           TELEGRAM_API_ROOT: ${{ secrets.TELEGRAM_API_ROOT }}
+          # Health module (Phase 3): stays off unless the secret is set to "true"
+          # AND a 32-byte HEALTH_ENCRYPTION_KEY secret is provided.
+          HEALTH_MODULE_ENABLED: ${{ secrets.HEALTH_MODULE_ENABLED }}
+          HEALTH_ENCRYPTION_KEY: ${{ secrets.HEALTH_ENCRYPTION_KEY }}
         run: |
           set -euo pipefail
           curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -n -i "$HOME/yc"
@@ -101,7 +105,8 @@ jobs:
             --environment "BOT_WEBHOOK_SECRET=$BOT_WEBHOOK_SECRET" \
             --environment "DATABASE_URL=$DATABASE_URL" \
             --environment "INITDATA_TTL_SECONDS=86400" \
-            --environment "HEALTH_MODULE_ENABLED=false" \
+            --environment "HEALTH_MODULE_ENABLED=${HEALTH_MODULE_ENABLED:-false}" \
+            --environment "HEALTH_ENCRYPTION_KEY=${HEALTH_ENCRYPTION_KEY:-}" \
             --environment "OWNER_TELEGRAM_IDS=169920903" \
             --environment "MINIAPP_URL=https://storage.yandexcloud.net/jet-fitness-app/index.html" \
             --environment "BOT_USERNAME=coach_pro_bot" \

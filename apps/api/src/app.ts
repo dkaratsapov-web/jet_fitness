@@ -14,6 +14,7 @@ import { programRoutes } from './routes/programs.js';
 import { paymentRoutes } from './routes/payments.js';
 import { nutritionRoutes } from './routes/nutrition.js';
 import { challengeRoutes } from './routes/challenges.js';
+import { healthModuleRoutes } from './routes/health.module.js';
 import { clientRoutes } from './routes/client.js';
 import { telegramRoutes } from './routes/telegram.js';
 import { env } from './env.js';
@@ -87,6 +88,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(paymentRoutes, { prefix: '/api' });
   await app.register(nutritionRoutes, { prefix: '/api' });
   await app.register(challengeRoutes, { prefix: '/api' });
+  await app.register(healthModuleRoutes, { prefix: '/api' });
   await app.register(clientRoutes, { prefix: '/api' });
 
   // Serverless single-function mode: also handle the Telegram webhook here.
