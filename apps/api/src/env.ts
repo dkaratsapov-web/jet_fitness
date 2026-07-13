@@ -42,6 +42,18 @@ export const env = {
   healthEncryptionKey: optional('HEALTH_ENCRYPTION_KEY', ''),
   platformFeePercent: Number(optional('PLATFORM_FEE_PERCENT', '10')),
 
+  // FatSecret Platform API (nutrition database). When both are set, food search
+  // prefers FatSecret and falls back to Open Food Facts. OAuth 2.0 client
+  // credentials. NOTE: FatSecret enforces IP whitelisting — the API's egress IP
+  // must be added in the FatSecret account (see infra/yandex/DEPLOY.md).
+  fatSecretClientId: optional('FATSECRET_CLIENT_ID', ''),
+  fatSecretClientSecret: optional('FATSECRET_CLIENT_SECRET', ''),
+  // "basic" (free/US) or "premier" (paid, multi-market incl. RU).
+  fatSecretScope: optional('FATSECRET_SCOPE', 'basic'),
+  // Region/language for localized results (premier only), e.g. RU / ru.
+  fatSecretRegion: optional('FATSECRET_REGION', ''),
+  fatSecretLanguage: optional('FATSECRET_LANGUAGE', ''),
+
   // If set, the API also serves the built Mini App static files from this
   // directory (single-origin mode — used by the Cloudflare tunnel demo stack).
   miniappDist: process.env.MINIAPP_DIST ?? '',

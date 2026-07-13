@@ -18,7 +18,9 @@ import {
   searchOpenFoodFacts,
   lookupBarcode,
   type Macros,
+  type FoodHit,
 } from '../nutritionSources.js';
+import { searchFatSecret, isFatSecretConfigured } from '../nutrition/fatsecret.js';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -241,29 +243,37 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
         per100: f.per100 as unknown as Macros,
       }));
 
-      // Then Open Food Facts (best-effort; cache new hits).
-      const remote = await searchOpenFoodFacts(q);
-      for (const r of remote) {
-        if (foods.length >= 15) break;
-        const saved = await prisma.foodItem.upsert({
-          where: { source_externalId: { source: 'openfoodfacts', externalId: r.externalId } },
-          update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },
-          create: {
-            source: 'openfoodfacts',
-            externalId: r.externalId,
-            name: r.name,
-            per100: r.per100 as object,
-            barcode: r.barcode,
-          },
-          select: { id: true, name: true, barcode: true, per100: true },
-        });
-        if (!foods.some((f) => f.id === saved.id)) {
-          foods.push({
-            id: saved.id,
-            name: saved.name,
-            barcode: saved.barcode,
-            per100: saved.per100 as unknown as Macros,
+      // Remote providers (best-effort; cache new hits). Prefer FatSecret when
+      // configured — its data is richer — then fall back to Open Food Facts.
+      const providers: Array<{ source: string; hits: FoodHit[] }> = [];
+      if (isFatSecretConfigured()) {
+        providers.push({ source: 'fatsecret', hits: await searchFatSecret(q) });
+      }
+      providers.push({ source: 'openfoodfacts', hits: await searchOpenFoodFacts(q) });
+
+      for (const provider of providers) {
+        for (const r of provider.hits) {
+          if (foods.length >= 15) break;
+          const saved = await prisma.foodItem.upsert({
+            where: { source_externalId: { source: provider.source, externalId: r.externalId } },
+            update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },
+            create: {
+              source: provider.source,
+              externalId: r.externalId,
+              name: r.name,
+              per100: r.per100 as object,
+              barcode: r.barcode,
+            },
+            select: { id: true, name: true, barcode: true, per100: true },
           });
+          if (!foods.some((f) => f.id === saved.id)) {
+            foods.push({
+              id: saved.id,
+              name: saved.name,
+              barcode: saved.barcode,
+              per100: saved.per100 as unknown as Macros,
+            });
+          }
         }
       }
       return { foods };

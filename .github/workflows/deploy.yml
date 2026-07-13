@@ -70,6 +70,13 @@ jobs:
           # AND a 32-byte HEALTH_ENCRYPTION_KEY secret is provided.
           HEALTH_MODULE_ENABLED: ${{ secrets.HEALTH_MODULE_ENABLED }}
           HEALTH_ENCRYPTION_KEY: ${{ secrets.HEALTH_ENCRYPTION_KEY }}
+          # FatSecret nutrition API (optional). When set, food search uses it
+          # first. Requires whitelisting this function's egress IP in FatSecret.
+          FATSECRET_CLIENT_ID: ${{ secrets.FATSECRET_CLIENT_ID }}
+          FATSECRET_CLIENT_SECRET: ${{ secrets.FATSECRET_CLIENT_SECRET }}
+          FATSECRET_SCOPE: ${{ secrets.FATSECRET_SCOPE }}
+          FATSECRET_REGION: ${{ secrets.FATSECRET_REGION }}
+          FATSECRET_LANGUAGE: ${{ secrets.FATSECRET_LANGUAGE }}
         run: |
           set -euo pipefail
           curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash -s -- -n -i "$HOME/yc"
@@ -99,6 +106,15 @@ jobs:
           if [ -n "${HEALTH_ENCRYPTION_KEY:-}" ]; then
             EXTRA+=(--environment "HEALTH_ENCRYPTION_KEY=$HEALTH_ENCRYPTION_KEY")
             EXTRA+=(--environment "HEALTH_MODULE_ENABLED=${HEALTH_MODULE_ENABLED:-true}")
+          fi
+
+          # FatSecret: only pass when configured (yc rejects empty env values).
+          if [ -n "${FATSECRET_CLIENT_ID:-}" ] && [ -n "${FATSECRET_CLIENT_SECRET:-}" ]; then
+            EXTRA+=(--environment "FATSECRET_CLIENT_ID=$FATSECRET_CLIENT_ID")
+            EXTRA+=(--environment "FATSECRET_CLIENT_SECRET=$FATSECRET_CLIENT_SECRET")
+            [ -n "${FATSECRET_SCOPE:-}" ] && EXTRA+=(--environment "FATSECRET_SCOPE=$FATSECRET_SCOPE")
+            [ -n "${FATSECRET_REGION:-}" ] && EXTRA+=(--environment "FATSECRET_REGION=$FATSECRET_REGION")
+            [ -n "${FATSECRET_LANGUAGE:-}" ] && EXTRA+=(--environment "FATSECRET_LANGUAGE=$FATSECRET_LANGUAGE")
           fi
 
           yc serverless function version create \
