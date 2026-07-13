@@ -45,6 +45,13 @@ export const env = {
   // Function serves both /api and /telegram/webhook). Off by default so the
   // standalone bot service and local dev/tests don't double-handle updates.
   enableTelegramWebhook: optional('ENABLE_TELEGRAM_WEBHOOK', 'false') === 'true',
+
+  // Telegram IDs auto-promoted to coach on login (owner bootstrap until the
+  // Phase-1 onboarding flow exists).
+  ownerTelegramIds: optional('OWNER_TELEGRAM_IDS', '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
 } as const;
 
 export type Env = typeof env;

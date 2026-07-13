@@ -81,12 +81,19 @@ export async function resolveAuthContext(
     include: { coachProfile: true, clientProfile: true },
   });
 
+  // Owner bootstrap: promote configured Telegram IDs to coach on first login.
+  let hasCoachProfile = Boolean(user.coachProfile);
+  if (!hasCoachProfile && env.ownerTelegramIds.includes(telegramId.toString())) {
+    await prisma.coachProfile.create({ data: { userId: user.id } });
+    hasCoachProfile = true;
+  }
+
   // A user is a "client" if they have a client profile OR any coach relationship.
   const clientRelations = await prisma.coachClient.count({
     where: { clientId: user.id },
   });
 
-  const isCoach = Boolean(user.coachProfile);
+  const isCoach = hasCoachProfile;
   const isClient = Boolean(user.clientProfile) || clientRelations > 0;
 
   const roles: AppRole[] = [];
