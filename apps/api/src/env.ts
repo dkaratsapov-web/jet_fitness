@@ -27,6 +27,8 @@ export const env = {
   port: toInt(optional('API_PORT', '3000'), 'API_PORT'),
 
   botToken: required('BOT_TOKEN'),
+  // Bot username (without @) — used to build invite deep-links.
+  botUsername: optional('BOT_USERNAME', '').replace(/^@/, ''),
   initDataTtlSeconds: toInt(optional('INITDATA_TTL_SECONDS', '86400'), 'INITDATA_TTL_SECONDS'),
 
   corsOrigins: optional('CORS_ORIGINS', 'http://localhost:5173')

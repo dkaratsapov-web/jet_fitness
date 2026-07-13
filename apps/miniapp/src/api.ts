@@ -57,7 +57,35 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+export interface CoachClient {
+  id: string;
+  firstName: string | null;
+  username: string | null;
+  status: 'pending' | 'active' | 'paused' | 'ended';
+  startedAt: string | null;
+  goal: string | null;
+}
+
+export interface Invite {
+  token: string;
+  deepLink: string | null;
+  expiresAt: string;
+}
+
+export interface CoachDashboard {
+  totalClients: number;
+  activeClients: number;
+  pendingInvites: number;
+}
+
 export const api = {
   session: () => request<SessionResponse>('/api/auth/session', { method: 'POST' }),
   me: () => request<SessionResponse>('/api/me'),
+
+  // Coach (Phase 1)
+  registerCoach: () =>
+    request<{ ok: boolean }>('/api/coach/register', { method: 'POST' }),
+  coachClients: () => request<CoachClient[]>('/api/coach/clients'),
+  coachDashboard: () => request<CoachDashboard>('/api/coach/dashboard'),
+  createInvite: () => request<Invite>('/api/coach/invites', { method: 'POST' }),
 };
