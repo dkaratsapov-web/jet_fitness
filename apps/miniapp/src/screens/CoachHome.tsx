@@ -57,17 +57,18 @@ export function CoachHome({ session }: { session: SessionResponse }) {
 
   return (
     <div className="flex flex-col gap-5 p-4">
-      <header className="flex items-center justify-between">
+      <header className="jf-rise flex items-center justify-between">
         <div>
-          <p className="text-brand-accent text-[11px] font-semibold uppercase tracking-[0.18em]">
+          <p className="jf-shimmer text-[11px] font-bold uppercase tracking-[0.22em]">
             Кабинет тренера
           </p>
           <h1 className="text-2xl font-semibold mt-0.5">Привет, {name}!</h1>
+          <hr className="jf-rule mt-2 w-24" />
         </div>
-        <LogoMark size={28} className="text-brand-accent shrink-0" />
+        <LogoMark size={30} className="text-brand-accent shrink-0" />
       </header>
 
-      <nav className="flex gap-1 rounded-2xl bg-brand-surface brand-line p-1">
+      <nav className="jf-rise jf-rise-1 flex gap-1 rounded-2xl bg-brand-surface brand-line p-1">
         <TabButton active={tab === 'clients'} onClick={() => setTab('clients')}>
           Клиенты
         </TabButton>
@@ -101,9 +102,9 @@ function TabButton({
 }) {
   return (
     <button
-      className={`flex-1 rounded-xl py-2 text-[13px] font-semibold transition-colors ${
+      className={`flex-1 rounded-xl py-2 text-[13px] font-semibold transition-all ${
         active
-          ? 'bg-brand-accent text-brand-onAccent shadow-card'
+          ? 'bg-brand-accent text-brand-onAccent shadow-[0_4px_16px_-4px_rgba(201,169,106,0.6)]'
           : 'text-brand-muted'
       }`}
       onClick={onClick}
@@ -162,7 +163,7 @@ function ClientsTab({ onOpenChat }: { onOpenChat: (c: CoachChat) => void }) {
   return (
     <div className="flex flex-col gap-4">
       {dash && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="jf-rise jf-rise-2 grid grid-cols-3 gap-3">
           <Stat value={dash.totalClients} label="всего" />
           <Stat value={dash.activeClients} label="активных" />
           <Stat value={dash.pendingInvites} label="приглашений" />
@@ -171,19 +172,19 @@ function ClientsTab({ onOpenChat }: { onOpenChat: (c: CoachChat) => void }) {
 
       {overview && (
         <>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="jf-rise jf-rise-3 grid grid-cols-3 gap-3">
             <Stat value={overview.business.monthRevenue} label="₽ за месяц" />
             <Stat value={overview.business.activeSubscriptions} label="подписок" />
             <Stat value={overview.activity.weekWorkouts} label="трен. за 7 дн." />
           </div>
           {overview.activity.unansweredCheckins > 0 && (
-            <div className="rounded-2xl bg-brand-surface brand-line shadow-card p-3 text-sm">
+            <div className="jf-card p-3 text-sm">
               💬 Check-in без ответа:{' '}
               <span className="font-semibold text-brand-accent">{overview.activity.unansweredCheckins}</span>
             </div>
           )}
           {overview.attention.length > 0 && (
-            <div className="rounded-2xl bg-brand-surface brand-line shadow-card p-3">
+            <div className="jf-card p-3">
               <div className="text-brand-muted text-[11px] font-semibold uppercase tracking-wide mb-2">Требуют внимания</div>
               <ul className="flex flex-col gap-1">
                 {overview.attention.map((a) => (
@@ -198,9 +199,9 @@ function ClientsTab({ onOpenChat }: { onOpenChat: (c: CoachChat) => void }) {
         </>
       )}
 
-      <section className="flex flex-col gap-2">
+      <section className="jf-rise jf-rise-4 flex flex-col gap-2">
         <button
-          className="rounded-2xl bg-brand-accent text-brand-onAccent p-4 font-semibold shadow-card disabled:opacity-60"
+          className="rounded-2xl bg-gradient-to-b from-brand-accentStrong to-brand-accent text-brand-onAccent p-4 font-semibold shadow-[0_8px_24px_-8px_rgba(201,169,106,0.65)] active:scale-[0.99] transition-transform disabled:opacity-60"
           onClick={onInvite}
           disabled={inviting}
         >
@@ -208,7 +209,7 @@ function ClientsTab({ onOpenChat }: { onOpenChat: (c: CoachChat) => void }) {
         </button>
 
         {invite && (
-          <div className="rounded-2xl bg-brand-surface brand-line shadow-card p-3 text-sm break-all">
+          <div className="jf-card p-3 text-sm break-all">
             <p className="text-tg-hint mb-1">
               Ссылка-приглашение (одноразовая, действует 7 дней):
             </p>
@@ -311,7 +312,7 @@ function ClientRow({
       : null;
 
   return (
-    <li className="rounded-2xl bg-brand-surface brand-line shadow-card p-3">
+    <li className="jf-card p-3">
       <div className="flex items-center gap-2">
         <button className="flex-1 flex items-center justify-between text-left" onClick={toggle}>
           <div>
@@ -686,7 +687,7 @@ function CheckinCard({ checkin, onReplied }: { checkin: Checkin; onReplied: () =
 
 function Stat({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-2xl bg-brand-surface brand-line shadow-card p-3 text-center">
+    <div className="jf-card p-3 text-center">
       <div className="text-2xl font-bold tabular text-brand-accent">{value}</div>
       <div className="text-brand-muted text-[11px] mt-0.5">{label}</div>
     </div>

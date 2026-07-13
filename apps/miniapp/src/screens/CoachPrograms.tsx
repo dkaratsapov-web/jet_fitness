@@ -47,15 +47,15 @@ export function CoachPrograms() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="jf-rise grid grid-cols-2 gap-3">
         <button
-          className="rounded-2xl bg-brand-accent text-brand-onAccent p-4 font-semibold shadow-card"
+          className="rounded-2xl bg-gradient-to-b from-brand-accentStrong to-brand-accent text-brand-onAccent p-4 font-semibold shadow-[0_8px_24px_-8px_rgba(201,169,106,0.6)] active:scale-[0.99] transition-transform"
           onClick={() => setBuilding(true)}
         >
           ➕ Создать<br />программу
         </button>
         <button
-          className="rounded-2xl bg-brand-surface brand-line shadow-card p-4 font-semibold text-brand-accent"
+          className="jf-card p-4 font-semibold text-brand-accent active:scale-[0.99] transition-transform"
           onClick={() => setLibrary(true)}
         >
           🎬 Библиотека<br />упражнений
@@ -72,7 +72,7 @@ export function CoachPrograms() {
       ) : (
         <ul className="flex flex-col gap-2">
           {programs.map((p) => (
-            <li key={p.id} className="rounded-2xl bg-brand-surface brand-line shadow-card p-3 flex flex-col gap-2">
+            <li key={p.id} className="jf-card p-3 flex flex-col gap-2">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="font-medium">{p.name}</div>
