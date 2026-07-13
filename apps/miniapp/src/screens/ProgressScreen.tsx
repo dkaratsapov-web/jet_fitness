@@ -18,7 +18,7 @@ const MEASURES: Array<{ key: string; label: string }> = [
 ];
 
 // Client progress (Phase 1): log weight / body-fat / measurements + history.
-export function ProgressScreen({ onBack }: { onBack: () => void }) {
+export function ProgressScreen({ onBack }: { onBack?: () => void }) {
   const [entries, setEntries] = useState<ProgressEntry[] | null>(null);
   const [weight, setWeight] = useState('');
   const [bodyFat, setBodyFat] = useState('');
@@ -70,9 +70,13 @@ export function ProgressScreen({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="jf-rise flex items-center justify-between">
-        <button className="text-brand-accent text-sm font-medium" onClick={onBack}>
-          ← Назад
-        </button>
+        {onBack ? (
+          <button className="text-brand-accent text-sm font-medium" onClick={onBack}>
+            ← Назад
+          </button>
+        ) : (
+          <span className="w-12" />
+        )}
         <h1 className="text-lg font-semibold">Прогресс</h1>
         <span className="w-12" />
       </header>

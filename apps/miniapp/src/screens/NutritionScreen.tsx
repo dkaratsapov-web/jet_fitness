@@ -21,7 +21,7 @@ export function NutritionScreen({
   onBack,
   onComment,
 }: {
-  onBack: () => void;
+  onBack?: () => void;
   onComment?: (label: string) => void;
 }) {
   const [day, setDay] = useState<NutritionDay | null>(null);
@@ -45,9 +45,13 @@ export function NutritionScreen({
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="flex items-center justify-between">
-        <button className="text-tg-link text-sm" onClick={onBack}>
-          ← Назад
-        </button>
+        {onBack ? (
+          <button className="text-tg-link text-sm" onClick={onBack}>
+            ← Назад
+          </button>
+        ) : (
+          <span className="w-12" />
+        )}
         <h1 className="text-lg font-semibold">Питание</h1>
         {onComment ? (
           <button
