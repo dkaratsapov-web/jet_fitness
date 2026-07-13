@@ -7,6 +7,7 @@ import {
   type FoodSearchItem,
 } from '../api';
 import { LineChart } from '../components/LineChart';
+import { Ring } from '../components/Ring';
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Завтрак',
@@ -46,31 +47,33 @@ export function NutritionScreen({ onBack }: { onBack: () => void }) {
       </header>
 
       {t && (
-        <div className="rounded-2xl bg-tg-secondaryBg p-4 flex flex-col gap-3">
-          <div className="flex items-baseline justify-between">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-semibold">{t.kcal}</span>
-              <span className="text-tg-hint">
-                {goal ? `/ ${goal.kcal} ккал` : 'ккал'}
-              </span>
+        <div className="rounded-2xl bg-tg-secondaryBg brand-line p-4 flex flex-col gap-3">
+          <div className="flex items-center gap-4">
+            <Ring value={t.kcal} goal={goal?.kcal ?? null} size={84} stroke={9}>
+              <span className="text-lg font-bold leading-none tabular">{t.kcal}</span>
+              <span className="text-brand-muted text-[10px] mt-0.5">ккал</span>
+            </Ring>
+            <div className="flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-bold tabular">{t.kcal}</span>
+                <span className="text-brand-muted text-sm">
+                  {goal ? `/ ${goal.kcal}` : ''}
+                </span>
+              </div>
+              {goal ? (
+                <div className="text-brand-muted text-xs mb-2">
+                  осталось {Math.max(0, goal.kcal - t.kcal)} ккал
+                </div>
+              ) : (
+                <div className="text-brand-muted text-xs mb-2">цель задаёт тренер</div>
+              )}
+              <div className="flex gap-2">
+                <MacroBar label="Б" value={t.protein} goal={goal?.protein} />
+                <MacroBar label="Ж" value={t.fat} goal={goal?.fat} />
+                <MacroBar label="У" value={t.carbs} goal={goal?.carbs} />
+              </div>
             </div>
-            {goal && (
-              <span className="text-tg-hint text-sm">
-                осталось {Math.max(0, goal.kcal - t.kcal)}
-              </span>
-            )}
           </div>
-          {goal && <Bar value={t.kcal} max={goal.kcal} />}
-          <div className="grid grid-cols-3 gap-2">
-            <Macro label="Белки" value={t.protein} goal={goal?.protein} />
-            <Macro label="Жиры" value={t.fat} goal={goal?.fat} />
-            <Macro label="Углеводы" value={t.carbs} goal={goal?.carbs} />
-          </div>
-          {!goal && (
-            <p className="text-tg-hint text-xs">
-              Цель по калориям пока не задана — её выставляет тренер.
-            </p>
-          )}
         </div>
       )}
 
@@ -142,28 +145,17 @@ export function NutritionScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-function Bar({ value, max }: { value: number; max: number }) {
-  const pct = Math.min(100, max > 0 ? (value / max) * 100 : 0);
-  const over = value > max;
+function MacroBar({ label, value, goal }: { label: string; value: number; goal?: number }) {
+  const pct = goal && goal > 0 ? Math.min(100, (value / goal) * 100) : 0;
   return (
-    <div className="h-2 rounded-full bg-tg-bg overflow-hidden">
-      <div
-        className={`h-full ${over ? 'bg-red-400' : 'bg-tg-link'}`}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
-
-function Macro({ label, value, goal }: { label: string; value: number; goal?: number }) {
-  return (
-    <div className="rounded-xl bg-tg-bg p-2 text-center">
-      <div className="text-tg-hint text-[10px]">{label}</div>
-      <div className="text-sm font-semibold">
-        {value}
-        {goal != null && <span className="text-tg-hint font-normal">/{goal}</span>}
+    <div className="flex-1">
+      <div className="text-brand-muted text-[10px] mb-1">
+        {label} {value}
+        {goal != null && <span className="opacity-70">/{goal}</span>}
       </div>
-      <div className="text-tg-hint text-[10px]">г</div>
+      <div className="h-1.5 rounded-full bg-brand-surface2 overflow-hidden">
+        <div className="h-full rounded-full bg-brand-accent" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

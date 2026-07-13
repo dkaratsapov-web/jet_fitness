@@ -16,6 +16,8 @@ import { HealthScreen } from './HealthScreen';
 import { OnboardingForm } from './OnboardingForm';
 import { LineChart } from '../components/LineChart';
 import { LogoMark } from '../components/Logo';
+import { Ring } from '../components/Ring';
+import type { NutritionDay, ProgressEntry } from '../api';
 
 // Client home (Phase 1): assigned program, run a workout, workout history.
 export function ClientHome({ session }: { session: SessionResponse }) {
@@ -29,6 +31,8 @@ export function ClientHome({ session }: { session: SessionResponse }) {
   >('home');
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [healthEnabled, setHealthEnabled] = useState(false);
+  const [nutriDay, setNutriDay] = useState<NutritionDay | null>(null);
+  const [progress, setProgress] = useState<ProgressEntry[]>([]);
 
   function loadHistory() {
     api.clientWorkouts().then(setHistory).catch(() => setHistory([]));
@@ -45,6 +49,8 @@ export function ClientHome({ session }: { session: SessionResponse }) {
       .catch(() => setNeedsOnboarding(false));
     api.clientChallenges().then(setChallenges).catch(() => setChallenges([]));
     api.healthStatus().then((s) => setHealthEnabled(s.moduleEnabled)).catch(() => setHealthEnabled(false));
+    api.nutritionDay().then(setNutriDay).catch(() => setNutriDay(null));
+    api.clientProgress().then(setProgress).catch(() => setProgress([]));
     loadHistory();
   }, []);
 
@@ -93,6 +99,13 @@ export function ClientHome({ session }: { session: SessionResponse }) {
       </header>
 
       {needsOnboarding && <OnboardingForm onDone={() => setNeedsOnboarding(false)} />}
+
+      <QuickGlance
+        nutri={nutriDay}
+        progress={progress}
+        onNutrition={() => setView('nutrition')}
+        onProgress={() => setView('progress')}
+      />
 
       {program === undefined ? (
         <p className="text-tg-hint text-sm">Загрузка…</p>
@@ -148,6 +161,75 @@ export function ClientHome({ session }: { session: SessionResponse }) {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+function QuickGlance({
+  nutri,
+  progress,
+  onNutrition,
+  onProgress,
+}: {
+  nutri: NutritionDay | null;
+  progress: ProgressEntry[];
+  onNutrition: () => void;
+  onProgress: () => void;
+}) {
+  const kcal = nutri?.totals.kcal ?? 0;
+  const goal = nutri?.target?.kcal ?? null;
+  const weights = progress.filter((e) => e.weightKg != null);
+  const latest = weights[0]?.weightKg ?? null;
+  const prev = weights[1]?.weightKg ?? null;
+  const delta = latest != null && prev != null ? +(latest - prev).toFixed(1) : null;
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <button
+        className="rounded-2xl bg-brand-surface brand-line p-3 flex items-center gap-3 text-left"
+        onClick={onNutrition}
+      >
+        <Ring value={kcal} goal={goal} size={52} stroke={6}>
+          <span className="text-[11px] font-bold tabular leading-none">{kcal}</span>
+        </Ring>
+        <div>
+          <div className="text-brand-muted text-[11px]">Питание</div>
+          <div className="text-sm font-semibold tabular">
+            {kcal}
+            {goal ? <span className="text-brand-muted font-normal"> / {goal}</span> : ''}
+          </div>
+          <div className="text-brand-muted text-[10px]">ккал сегодня</div>
+        </div>
+      </button>
+
+      <button
+        className="rounded-2xl bg-brand-surface brand-line p-3 flex flex-col justify-center text-left"
+        onClick={onProgress}
+      >
+        <div className="text-brand-muted text-[11px]">Вес</div>
+        {latest != null ? (
+          <>
+            <div className="text-lg font-bold tabular">
+              {latest}
+              <span className="text-brand-muted text-xs font-normal"> кг</span>
+              {delta != null && delta !== 0 && (
+                <span
+                  className="text-xs ml-1"
+                  style={{ color: delta < 0 ? 'var(--pos)' : 'var(--neg)' }}
+                >
+                  {delta > 0 ? '+' : ''}
+                  {delta}
+                </span>
+              )}
+            </div>
+            <div className="text-brand-muted text-[10px]">
+              {weights.length >= 2 ? 'динамика в разделе' : 'текущий вес'}
+            </div>
+          </>
+        ) : (
+          <div className="text-brand-muted text-xs mt-1">добавь замер</div>
+        )}
+      </button>
     </div>
   );
 }
