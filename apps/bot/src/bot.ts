@@ -13,11 +13,31 @@ import { parseStartParam } from '@jet/shared';
 import { env } from './env.js';
 
 export function createBot(): Bot {
+  // Static bot identity so grammY never calls getMe on init — on serverless
+  // cold starts that extra round-trip through the relay slowed the webhook
+  // response enough for Telegram to retry the update and re-send messages.
+  const botId = Number(env.botToken.split(':')[0]);
+  const botInfo =
+    Number.isFinite(botId) && env.botUsername
+      ? {
+          id: botId,
+          is_bot: true as const,
+          first_name: 'Jet Fitness',
+          username: env.botUsername,
+          can_join_groups: true,
+          can_read_all_group_messages: false,
+          supports_inline_queries: false,
+          can_connect_to_business: false,
+          has_main_web_app: false,
+        }
+      : undefined;
+
   // apiRoot routes all outbound Telegram calls through the configured endpoint
   // (Cloudflare Worker relay when api.telegram.org is unreachable from RF).
   const bot = new Bot(env.botToken, {
     client: { apiRoot: env.telegramApiRoot },
-  });
+    botInfo,
+  } as ConstructorParameters<typeof Bot>[1]);
 
   bot.command('start', async (ctx) => {
     const from = ctx.from;

@@ -21,6 +21,8 @@ export const env = {
   webhookSecret: process.env.BOT_WEBHOOK_SECRET ?? '',
   // Public HTTPS URL of the Mini App, used to build the web_app launch button.
   miniAppUrl: optional('MINIAPP_URL', ''),
+  // Bot @username — lets us set a static botInfo and skip getMe on cold start.
+  botUsername: optional('BOT_USERNAME', '').replace(/^@/, ''),
   // Port for the webhook HTTP server (webhook mode only).
   botPort: Number(optional('BOT_PORT', '3001')),
 } as const;
