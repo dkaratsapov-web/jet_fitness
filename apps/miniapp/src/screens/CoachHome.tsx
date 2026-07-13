@@ -6,6 +6,7 @@ import {
   type CoachDashboard,
   type Invite,
 } from '../api';
+import { CoachPrograms } from './CoachPrograms';
 
 const STATUS_LABEL: Record<CoachClient['status'], string> = {
   pending: 'ожидает',
@@ -14,9 +15,57 @@ const STATUS_LABEL: Record<CoachClient['status'], string> = {
   ended: 'завершён',
 };
 
-// Coach cabinet (Phase 1): client list + invite generation.
+type Tab = 'clients' | 'programs';
+
+// Coach cabinet (Phase 1): client list + invites + program builder.
 export function CoachHome({ session }: { session: SessionResponse }) {
   const name = session.user.firstName ?? 'тренер';
+  const [tab, setTab] = useState<Tab>('clients');
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <header>
+        <p className="text-tg-hint text-sm">Кабинет тренера</p>
+        <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
+      </header>
+
+      <nav className="flex gap-2 rounded-2xl bg-tg-secondaryBg p-1">
+        <TabButton active={tab === 'clients'} onClick={() => setTab('clients')}>
+          Клиенты
+        </TabButton>
+        <TabButton active={tab === 'programs'} onClick={() => setTab('programs')}>
+          Программы
+        </TabButton>
+      </nav>
+
+      {tab === 'clients' ? <ClientsTab /> : <CoachPrograms />}
+    </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      className={`flex-1 rounded-xl py-2 text-sm font-medium ${
+        active ? 'bg-tg-button text-tg-buttonText' : 'text-tg-hint'
+      }`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Clients + invites (the original coach home content).
+function ClientsTab() {
   const [clients, setClients] = useState<CoachClient[] | null>(null);
   const [dash, setDash] = useState<CoachDashboard | null>(null);
   const [invite, setInvite] = useState<Invite | null>(null);
@@ -54,12 +103,7 @@ export function CoachHome({ session }: { session: SessionResponse }) {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <header>
-        <p className="text-tg-hint text-sm">Кабинет тренера</p>
-        <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
-      </header>
-
+    <div className="flex flex-col gap-4">
       {dash && (
         <div className="grid grid-cols-3 gap-3">
           <Stat value={dash.totalClients} label="всего" />

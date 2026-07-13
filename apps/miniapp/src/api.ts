@@ -78,6 +78,70 @@ export interface CoachDashboard {
   pendingInvites: number;
 }
 
+export interface ExerciseLite {
+  id: string;
+  name: string;
+  muscleGroup: string | null;
+  videoUrl?: string | null;
+  custom: boolean;
+}
+
+export interface ProgramSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  isTemplate: boolean;
+  dayCount: number;
+  assignmentCount: number;
+  updatedAt: string;
+}
+
+// Shape sent to POST /coach/programs.
+export interface ProgramDraftExercise {
+  exerciseId: string;
+  sets?: number | null;
+  reps?: string | null;
+  weight?: string | null;
+  restSec?: number | null;
+  notes?: string | null;
+}
+export interface ProgramDraftDay {
+  title?: string | null;
+  exercises: ProgramDraftExercise[];
+}
+export interface ProgramDraft {
+  name: string;
+  description?: string | null;
+  days: ProgramDraftDay[];
+}
+
+// Shape returned for a client's active program.
+export interface ClientProgramExercise {
+  id: string;
+  name: string;
+  muscleGroup: string | null;
+  videoUrl: string | null;
+  sets: number | null;
+  reps: string | null;
+  weight: string | null;
+  restSec: number | null;
+  tempo: string | null;
+  notes: string | null;
+}
+export interface ClientProgramDay {
+  id: string;
+  order: number;
+  title: string | null;
+  exercises: ClientProgramExercise[];
+}
+export interface ClientProgram {
+  id: string;
+  name: string;
+  description: string | null;
+  startDate: string;
+  days: ClientProgramDay[];
+}
+
 export const api = {
   session: () => request<SessionResponse>('/api/auth/session', { method: 'POST' }),
   me: () => request<SessionResponse>('/api/me'),
@@ -92,4 +156,28 @@ export const api = {
   coachClients: () => request<CoachClient[]>('/api/coach/clients'),
   coachDashboard: () => request<CoachDashboard>('/api/coach/dashboard'),
   createInvite: () => request<Invite>('/api/coach/invites', { method: 'POST' }),
+
+  // Programs (Phase 1)
+  exercises: () => request<ExerciseLite[]>('/api/coach/exercises'),
+  createExercise: (body: { name: string; muscleGroup?: string }) =>
+    request<ExerciseLite>('/api/coach/exercises', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  programs: () => request<ProgramSummary[]>('/api/coach/programs'),
+  createProgram: (draft: ProgramDraft) =>
+    request<{ id: string; ok: boolean }>('/api/coach/programs', {
+      method: 'POST',
+      body: JSON.stringify(draft),
+    }),
+  deleteProgram: (id: string) =>
+    request<{ ok: boolean }>(`/api/coach/programs/${id}`, { method: 'DELETE' }),
+  assignProgram: (id: string, clientId: string) =>
+    request<{ ok: boolean; assignmentId: string }>(`/api/coach/programs/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ clientId }),
+    }),
+
+  // Client (Phase 1)
+  clientProgram: () => request<{ program: ClientProgram | null }>('/api/client/program'),
 };

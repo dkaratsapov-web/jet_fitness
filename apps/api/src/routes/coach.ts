@@ -8,21 +8,12 @@
 //   GET  /coach/dashboard       — basic counts
 
 import { randomBytes } from 'node:crypto';
-import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { env } from '../env.js';
+import { requireCoach } from '../auth/guards.js';
 
 const INVITE_TTL_DAYS = 7;
-
-/** Guard: require the request to be an authenticated coach. */
-async function requireCoach(request: FastifyRequest, reply: FastifyReply): Promise<boolean> {
-  const auth = request.auth!;
-  if (!auth.isCoach) {
-    reply.code(403).send({ error: 'forbidden', reason: 'not_a_coach' });
-    return false;
-  }
-  return true;
-}
 
 export const coachRoutes: FastifyPluginAsync = async (fastify) => {
   // Become a coach (idempotent).
