@@ -17,6 +17,9 @@ export interface ApiGatewayEvent {
   url?: string;
   headers?: Record<string, string>;
   queryStringParameters?: Record<string, string> | null;
+  // Yandex API Gateway greedy {proxy+} route puts the real path segments here.
+  params?: Record<string, string>;
+  pathParams?: Record<string, string>;
   body?: string;
   isBase64Encoded?: boolean;
 }
@@ -41,7 +44,22 @@ async function getApp(): Promise<FastifyInstance> {
 }
 
 function buildUrl(event: ApiGatewayEvent): string {
-  const path = event.path ?? event.url ?? '/';
+  // Yandex API Gateway routes everything through the greedy {proxy+} operation,
+  // so event.path/url is the literal template "/{proxy+}". The actual path is in
+  // the `proxy` path parameter; reconstruct from it, falling back to any concrete
+  // url/path (e.g. the root "/" operation).
+  const proxy = event.pathParams?.proxy ?? event.params?.proxy;
+  let path: string;
+  if (typeof proxy === 'string' && proxy.length > 0) {
+    path = '/' + proxy.replace(/^\/+/, '');
+  } else if (event.url && !event.url.includes('{')) {
+    path = event.url;
+  } else if (event.path && !event.path.includes('{')) {
+    path = event.path;
+  } else {
+    path = '/';
+  }
+
   const qs = event.queryStringParameters;
   if (qs && Object.keys(qs).length > 0) {
     const search = new URLSearchParams(qs).toString();
