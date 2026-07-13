@@ -89,6 +89,47 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
     async (request) => daySummary(request.auth!.userId, request.query.date),
   );
 
+  // Last 7 days: per-day kcal + averages vs target.
+  fastify.get('/client/nutrition/week', { preHandler: fastify.requireAuth }, async (request) => {
+    const clientId = request.auth!.userId;
+    const target = await currentTarget(clientId);
+    const days: Array<{ date: string; kcal: number; protein: number; fat: number; carbs: number }> = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i -= 1) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - i * 86400000);
+      const { start, end } = dayRange(d.toISOString().slice(0, 10));
+      const meals = await prisma.mealLog.findMany({
+        where: { clientId, date: { gte: start, lt: end } },
+        select: { kcal: true, protein: true, fat: true, carbs: true },
+      });
+      const sum = meals.reduce(
+        (a, m) => ({
+          kcal: a.kcal + m.kcal,
+          protein: a.protein + m.protein,
+          fat: a.fat + m.fat,
+          carbs: a.carbs + m.carbs,
+        }),
+        { kcal: 0, protein: 0, fat: 0, carbs: 0 },
+      );
+      days.push({
+        date: start.toISOString().slice(0, 10),
+        kcal: Math.round(sum.kcal),
+        protein: Math.round(sum.protein),
+        fat: Math.round(sum.fat),
+        carbs: Math.round(sum.carbs),
+      });
+    }
+    const logged = days.filter((d) => d.kcal > 0);
+    const avg = (key: 'kcal' | 'protein' | 'fat' | 'carbs') =>
+      logged.length ? Math.round(logged.reduce((n, d) => n + d[key], 0) / logged.length) : 0;
+    return {
+      target,
+      days,
+      averages: { kcal: avg('kcal'), protein: avg('protein'), fat: avg('fat'), carbs: avg('carbs') },
+      loggedDays: logged.length,
+    };
+  });
+
   // ── Client: log a meal ──────────────────────────────────────────
   fastify.post<{
     Body: {

@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import {
   api,
   type NutritionDay,
+  type NutritionWeek,
   type MealType,
   type FoodSearchItem,
 } from '../api';
+import { LineChart } from '../components/LineChart';
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Завтрак',
@@ -16,10 +18,12 @@ const MEAL_LABELS: Record<MealType, string> = {
 // Client nutrition (Phase 2): daily calories & macros vs target + food logging.
 export function NutritionScreen({ onBack }: { onBack: () => void }) {
   const [day, setDay] = useState<NutritionDay | null>(null);
+  const [week, setWeek] = useState<NutritionWeek | null>(null);
   const [adding, setAdding] = useState(false);
 
   function load() {
     api.nutritionDay().then(setDay).catch(() => setDay(null));
+    api.nutritionWeek().then(setWeek).catch(() => setWeek(null));
   }
   useEffect(load, []);
 
@@ -76,6 +80,28 @@ export function NutritionScreen({ onBack }: { onBack: () => void }) {
       >
         ➕ Добавить приём пищи
       </button>
+
+      {week && week.loggedDays >= 2 && (
+        <div className="rounded-2xl bg-tg-secondaryBg p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-tg-hint text-xs font-medium">Калории за 7 дней</span>
+            <span className="text-sm">
+              среднее <span className="font-semibold">{week.averages.kcal}</span>
+              {week.target ? ` / ${week.target.kcal}` : ''} ккал
+            </span>
+          </div>
+          <LineChart
+            unit=" ккал"
+            points={week.days.map((d) => ({
+              value: d.kcal,
+              label: new Date(d.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }),
+            }))}
+          />
+          <div className="text-tg-hint text-xs">
+            Среднее БЖУ: Б{week.averages.protein} · Ж{week.averages.fat} · У{week.averages.carbs}
+          </div>
+        </div>
+      )}
 
       <section className="flex flex-col gap-2">
         {day && day.meals.length === 0 ? (

@@ -323,4 +323,65 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
       return { totalClients: total, activeClients: active, pendingInvites };
     },
   );
+
+  // Rich dashboard: business metrics + clients needing attention (spec §8).
+  fastify.get('/coach/overview', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    if (!(await requireCoach(request, reply))) return;
+    const auth = request.auth!;
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 86400000);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const links = await prisma.coachClient.findMany({
+      where: { coachId: auth.userId },
+      include: {
+        client: { select: { id: true, firstName: true, username: true } },
+      },
+    });
+    const activeLinks = links.filter((l) => l.status === 'active');
+
+    const [pendingInvites, activeSubs, monthPayments, weekWorkouts, unansweredCheckins] =
+      await Promise.all([
+        prisma.coachInvite.count({
+          where: { coachId: auth.userId, usedAt: null, expiresAt: { gt: now } },
+        }),
+        prisma.subscription.count({ where: { coachId: auth.userId, status: 'active' } }),
+        prisma.payment.findMany({
+          where: { coachId: auth.userId, status: 'paid', paidAt: { gte: monthStart } },
+          select: { amount: true },
+        }),
+        prisma.workoutLog.count({
+          where: { clientId: { in: activeLinks.map((l) => l.client.id) }, date: { gte: weekAgo } },
+        }),
+        prisma.checkIn.count({
+          where: { clientId: { in: activeLinks.map((l) => l.client.id) }, coachReply: null },
+        }),
+      ]);
+
+    // Per-active-client: flag no workout in 7 days.
+    const attention: Array<{ id: string; name: string; reason: string }> = [];
+    for (const l of activeLinks) {
+      const last = await prisma.workoutLog.findFirst({
+        where: { clientId: l.client.id },
+        orderBy: { date: 'desc' },
+        select: { date: true },
+      });
+      const name = l.client.firstName || (l.client.username ? `@${l.client.username}` : 'Клиент');
+      if (!last) {
+        attention.push({ id: l.client.id, name, reason: 'ни одной тренировки' });
+      } else if (last.date < weekAgo) {
+        const days = Math.floor((now.getTime() - last.date.getTime()) / 86400000);
+        attention.push({ id: l.client.id, name, reason: `нет тренировок ${days} дн.` });
+      }
+    }
+
+    const monthRevenue = Math.round(monthPayments.reduce((n, p) => n + p.amount, 0) / 100);
+
+    return {
+      clients: { total: links.length, active: activeLinks.length, pendingInvites },
+      business: { monthRevenue, activeSubscriptions: activeSubs },
+      activity: { weekWorkouts, unansweredCheckins },
+      attention,
+    };
+  });
 };
