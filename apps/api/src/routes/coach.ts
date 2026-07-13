@@ -13,7 +13,7 @@ import { prisma } from '@jet/db';
 import { env } from '../env.js';
 import { requireCoach } from '../auth/guards.js';
 import { summarizeWorkout, type WorkoutWithSets } from './workoutSummary.js';
-import { listProgress, listCheckins, listProgressPhotos } from './client.js';
+import { listProgress, listCheckins, listProgressPhotos, listFormVideos } from './client.js';
 import { notifyUser } from '../notify.js';
 
 const INVITE_TTL_DAYS = 7;
@@ -192,6 +192,61 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
         return;
       }
       return listProgressPhotos(request.params.id);
+    },
+  );
+
+  // A client's technique videos (with view URLs + comments).
+  fastify.get<{ Params: { id: string } }>(
+    '/coach/clients/:id/form-videos',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const link = await prisma.coachClient.findUnique({
+        where: { coachId_clientId: { coachId: auth.userId, clientId: request.params.id } },
+        select: { id: true },
+      });
+      if (!link) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      return listFormVideos(request.params.id);
+    },
+  );
+
+  // Comment on a client's technique video (must be the client's coach).
+  fastify.post<{ Params: { id: string }; Body: { body: string } }>(
+    '/coach/form-videos/:id/comments',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const text = request.body?.body?.trim();
+      if (!text) {
+        reply.code(400).send({ error: 'bad_request', reason: 'body_required' });
+        return;
+      }
+      const video = await prisma.formVideo.findUnique({
+        where: { id: request.params.id },
+        select: { clientId: true },
+      });
+      if (!video) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const link = await prisma.coachClient.findUnique({
+        where: { coachId_clientId: { coachId: auth.userId, clientId: video.clientId } },
+        select: { id: true },
+      });
+      if (!link) {
+        reply.code(403).send({ error: 'forbidden', reason: 'not_your_client' });
+        return;
+      }
+      await prisma.formVideoComment.create({
+        data: { formVideoId: request.params.id, coachId: auth.userId, body: text },
+      });
+      await notifyUser(video.clientId, '🎥 Тренер прокомментировал ваше видео техники.');
+      return { ok: true };
     },
   );
 

@@ -9,6 +9,7 @@ import {
   type ProgressEntry,
   type Checkin,
   type ProgressPhoto,
+  type FormVideo,
 } from '../api';
 import { CoachPrograms } from './CoachPrograms';
 import { CoachPayments } from './CoachPayments';
@@ -176,12 +177,19 @@ function ClientRow({ client }: { client: CoachClient }) {
   const [progress, setProgress] = useState<ProgressEntry[] | null>(null);
   const [checkins, setCheckins] = useState<Checkin[] | null>(null);
   const [photos, setPhotos] = useState<ProgressPhoto[] | null>(null);
+  const [videos, setVideos] = useState<FormVideo[] | null>(null);
 
   function loadCheckins() {
     api
       .coachClientCheckins(client.id)
       .then(setCheckins)
       .catch(() => setCheckins([]));
+  }
+  function loadVideos() {
+    api
+      .coachClientVideos(client.id)
+      .then(setVideos)
+      .catch(() => setVideos([]));
   }
 
   function toggle() {
@@ -200,6 +208,7 @@ function ClientRow({ client }: { client: CoachClient }) {
         .coachClientPhotos(client.id)
         .then(setPhotos)
         .catch(() => setPhotos([]));
+      loadVideos();
       loadCheckins();
     }
   }
@@ -292,6 +301,17 @@ function ClientRow({ client }: { client: CoachClient }) {
             </ul>
           )}
 
+          {videos && videos.length > 0 && (
+            <>
+              <div className="text-tg-hint text-xs font-medium mt-1">Техника</div>
+              <ul className="flex flex-col gap-2">
+                {videos.map((v) => (
+                  <VideoCard key={v.id} video={v} onCommented={loadVideos} />
+                ))}
+              </ul>
+            </>
+          )}
+
           <div className="text-tg-hint text-xs font-medium mt-1">Check-in</div>
           {checkins === null ? (
             <p className="text-tg-hint text-xs">Загрузка…</p>
@@ -306,6 +326,56 @@ function ClientRow({ client }: { client: CoachClient }) {
           )}
         </div>
       )}
+    </li>
+  );
+}
+
+function VideoCard({ video, onCommented }: { video: FormVideo; onCommented: () => void }) {
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function send() {
+    if (!body.trim()) return;
+    setBusy(true);
+    try {
+      await api.commentVideo(video.id, body.trim());
+      onCommented();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <li className="rounded-xl bg-tg-bg p-2 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">{video.exerciseName ?? 'Видео техники'}</span>
+        <span className="text-tg-hint text-xs">
+          {new Date(video.createdAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+        </span>
+      </div>
+      {video.viewUrl && (
+        <video src={video.viewUrl} controls className="w-full rounded-lg bg-black" />
+      )}
+      {video.comments.map((c) => (
+        <div key={c.id} className="rounded-lg bg-tg-secondaryBg p-2 text-sm">
+          {c.body}
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <input
+          className="flex-1 rounded-lg bg-tg-secondaryBg p-2 text-sm outline-none"
+          placeholder="Комментарий по технике…"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+        />
+        <button
+          className="rounded-lg bg-tg-button text-tg-buttonText px-3 text-sm disabled:opacity-60"
+          onClick={send}
+          disabled={busy || !body.trim()}
+        >
+          {busy ? '…' : 'OK'}
+        </button>
+      </div>
     </li>
   );
 }
