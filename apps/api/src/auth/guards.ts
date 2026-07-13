@@ -18,3 +18,16 @@ export async function requireCoach(
   }
   return true;
 }
+
+/** Require the request to be the platform owner. */
+export async function requireOwner(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<boolean> {
+  const auth = request.auth!;
+  if (!auth.isOwner) {
+    reply.code(403).send({ error: 'forbidden', reason: 'not_owner' });
+    return false;
+  }
+  return true;
+}

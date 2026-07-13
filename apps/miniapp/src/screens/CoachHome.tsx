@@ -10,6 +10,7 @@ import {
   type Checkin,
 } from '../api';
 import { CoachPrograms } from './CoachPrograms';
+import { CoachPayments } from './CoachPayments';
 
 const STATUS_LABEL: Record<CoachClient['status'], string> = {
   pending: 'ожидает',
@@ -18,7 +19,7 @@ const STATUS_LABEL: Record<CoachClient['status'], string> = {
   ended: 'завершён',
 };
 
-type Tab = 'clients' | 'programs';
+type Tab = 'clients' | 'programs' | 'payments';
 
 // Coach cabinet (Phase 1): client list + invites + program builder.
 export function CoachHome({ session }: { session: SessionResponse }) {
@@ -39,9 +40,14 @@ export function CoachHome({ session }: { session: SessionResponse }) {
         <TabButton active={tab === 'programs'} onClick={() => setTab('programs')}>
           Программы
         </TabButton>
+        <TabButton active={tab === 'payments'} onClick={() => setTab('payments')}>
+          Оплаты
+        </TabButton>
       </nav>
 
-      {tab === 'clients' ? <ClientsTab /> : <CoachPrograms />}
+      {tab === 'clients' && <ClientsTab />}
+      {tab === 'programs' && <CoachPrograms />}
+      {tab === 'payments' && <CoachPayments />}
     </div>
   );
 }

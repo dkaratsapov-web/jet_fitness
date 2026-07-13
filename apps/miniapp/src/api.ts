@@ -197,6 +197,33 @@ export interface CheckinInput {
   comment?: string | null;
 }
 
+export interface Subscription {
+  id: string;
+  clientId: string;
+  clientName: string;
+  planName: string;
+  amount: number;
+  periodDays: number;
+  status: 'active' | 'past_due' | 'canceled';
+  currentPeriodEnd: string | null;
+  paidTotal: number;
+  paymentsCount: number;
+}
+
+export interface CoachRevenue {
+  gross: number;
+  thisMonth: number;
+  commission: number;
+  net: number;
+  paymentsCount: number;
+  feePercent: number;
+}
+
+export interface OwnerRevenue extends CoachRevenue {
+  coachesCount: number;
+  perCoach: Array<{ coachId: string; coachName: string; gross: number; commission: number }>;
+}
+
 export const api = {
   session: () => request<SessionResponse>('/api/auth/session', { method: 'POST' }),
   me: () => request<SessionResponse>('/api/me'),
@@ -264,4 +291,26 @@ export const api = {
       body: JSON.stringify(body),
     }),
   clientCheckins: () => request<Checkin[]>('/api/client/checkins'),
+
+  // Payments (Phase 1)
+  coachSubscriptions: () => request<Subscription[]>('/api/coach/subscriptions'),
+  createSubscription: (
+    clientId: string,
+    body: { planName: string; amount: number; periodDays: number },
+  ) =>
+    request<{ ok: boolean; id: string }>(`/api/coach/clients/${clientId}/subscriptions`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  recordPayment: (subscriptionId: string, amount?: number) =>
+    request<{ ok: boolean; amount: number; commission: number }>(
+      `/api/coach/subscriptions/${subscriptionId}/payments`,
+      { method: 'POST', body: JSON.stringify(amount != null ? { amount } : {}) },
+    ),
+  cancelSubscription: (subscriptionId: string) =>
+    request<{ ok: boolean }>(`/api/coach/subscriptions/${subscriptionId}/cancel`, {
+      method: 'POST',
+    }),
+  coachRevenue: () => request<CoachRevenue>('/api/coach/revenue'),
+  ownerRevenue: () => request<OwnerRevenue>('/api/owner/revenue'),
 };
