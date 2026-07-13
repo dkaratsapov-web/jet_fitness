@@ -90,6 +90,9 @@ export interface ExerciseLite {
   name: string;
   muscleGroup: string | null;
   videoUrl?: string | null;
+  technique?: string | null;
+  recommendations?: string | null;
+  precautions?: string | null;
   custom: boolean;
 }
 
@@ -128,6 +131,9 @@ export interface ClientProgramExercise {
   name: string;
   muscleGroup: string | null;
   videoUrl: string | null;
+  technique?: string | null;
+  recommendations?: string | null;
+  precautions?: string | null;
   sets: number | null;
   reps: string | null;
   weight: string | null;
@@ -391,6 +397,24 @@ export interface OwnerClientRow {
   coaches: number;
 }
 
+// Coach ↔ client messaging.
+export type MessageContext = 'program' | 'nutrition';
+export interface ChatMessage {
+  id: string;
+  body: string;
+  mine: boolean;
+  fromCoach: boolean;
+  contextType: MessageContext | null;
+  contextLabel: string | null;
+  createdAt: string;
+  readAt: string | null;
+}
+export interface ChatContext {
+  contextType?: MessageContext;
+  contextId?: string;
+  contextLabel?: string;
+}
+
 export const api = {
   session: () => request<SessionResponse>('/api/auth/session', { method: 'POST' }),
   me: () => request<SessionResponse>('/api/me'),
@@ -475,6 +499,27 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ reply }),
     }),
+
+  // Messaging — coach side
+  coachClientMessages: (clientId: string) =>
+    request<{ messages: ChatMessage[] }>(`/api/coach/clients/${clientId}/messages`),
+  coachSendMessage: (clientId: string, body: string, ctx?: ChatContext) =>
+    request<ChatMessage>(`/api/coach/clients/${clientId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body, ...ctx }),
+    }),
+  coachUnread: () =>
+    request<{ total: number; byClient: Record<string, number> }>('/api/coach/messages/unread'),
+
+  // Messaging — client side
+  clientMessages: () =>
+    request<{ coach: { name: string } | null; messages: ChatMessage[] }>('/api/client/messages'),
+  clientSendMessage: (body: string, ctx?: ChatContext) =>
+    request<ChatMessage>('/api/client/messages', {
+      method: 'POST',
+      body: JSON.stringify({ body, ...ctx }),
+    }),
+  clientUnread: () => request<{ count: number }>('/api/client/messages/unread'),
 
   // Client (Phase 1)
   clientProgram: () => request<{ program: ClientProgram | null }>('/api/client/program'),

@@ -17,6 +17,7 @@ import { challengeRoutes } from './routes/challenges.js';
 import { healthModuleRoutes } from './routes/health.module.js';
 import { ownerRoutes } from './routes/owner.js';
 import { clientRoutes } from './routes/client.js';
+import { messageRoutes } from './routes/messages.js';
 import { telegramRoutes } from './routes/telegram.js';
 import { env } from './env.js';
 
@@ -92,6 +93,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(healthModuleRoutes, { prefix: '/api' });
   await app.register(ownerRoutes, { prefix: '/api' });
   await app.register(clientRoutes, { prefix: '/api' });
+  await app.register(messageRoutes, { prefix: '/api' });
 
   // Serverless single-function mode: also handle the Telegram webhook here.
   if (env.enableTelegramWebhook) {

@@ -13,9 +13,11 @@ import {
   type FormVideo,
   type NutritionDay,
 } from '../api';
+import type { ChatContext } from '../api';
 import { CoachPrograms } from './CoachPrograms';
 import { CoachPayments } from './CoachPayments';
 import { CoachChallenges } from './CoachChallenges';
+import { ChatScreen } from '../components/ChatScreen';
 
 const STATUS_LABEL: Record<CoachClient['status'], string> = {
   pending: 'ожидает',
@@ -26,10 +28,31 @@ const STATUS_LABEL: Record<CoachClient['status'], string> = {
 
 type Tab = 'clients' | 'programs' | 'payments' | 'challenges';
 
+// A chat opened with one client, optionally pre-scoped to a context.
+export interface CoachChat {
+  clientId: string;
+  name: string;
+  context?: (ChatContext & { hint?: string }) | null;
+}
+
 // Coach cabinet (Phase 1): client list + invites + program builder.
 export function CoachHome({ session }: { session: SessionResponse }) {
   const name = session.user.firstName ?? 'тренер';
   const [tab, setTab] = useState<Tab>('clients');
+  const [chat, setChat] = useState<CoachChat | null>(null);
+
+  if (chat) {
+    return (
+      <ChatScreen
+        title={chat.name}
+        subtitle="клиент"
+        presetContext={chat.context ?? null}
+        load={() => api.coachClientMessages(chat.clientId).then((r) => r.messages)}
+        send={(body, ctx) => api.coachSendMessage(chat.clientId, body, ctx)}
+        onBack={() => setChat(null)}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -53,7 +76,7 @@ export function CoachHome({ session }: { session: SessionResponse }) {
         </TabButton>
       </nav>
 
-      {tab === 'clients' && <ClientsTab />}
+      {tab === 'clients' && <ClientsTab onOpenChat={setChat} />}
       {tab === 'programs' && <CoachPrograms />}
       {tab === 'payments' && <CoachPayments />}
       {tab === 'challenges' && <CoachChallenges />}
@@ -83,13 +106,14 @@ function TabButton({
 }
 
 // Clients + invites (the original coach home content).
-function ClientsTab() {
+function ClientsTab({ onOpenChat }: { onOpenChat: (c: CoachChat) => void }) {
   const [clients, setClients] = useState<CoachClient[] | null>(null);
   const [dash, setDash] = useState<CoachDashboard | null>(null);
   const [overview, setOverview] = useState<CoachOverview | null>(null);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [inviting, setInviting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [unread, setUnread] = useState<Record<string, number>>({});
 
   async function reload() {
     const [c, d, o] = await Promise.all([
@@ -100,6 +124,7 @@ function ClientsTab() {
     setClients(c);
     setDash(d);
     setOverview(o);
+    api.coachUnread().then((u) => setUnread(u.byClient)).catch(() => setUnread({}));
   }
 
   useEffect(() => {
@@ -203,7 +228,12 @@ function ClientsTab() {
         ) : (
           <ul className="flex flex-col gap-2">
             {clients.map((c) => (
-              <ClientRow key={c.id} client={c} />
+              <ClientRow
+                key={c.id}
+                client={c}
+                unread={unread[c.id] ?? 0}
+                onOpenChat={onOpenChat}
+              />
             ))}
           </ul>
         )}
@@ -213,7 +243,16 @@ function ClientsTab() {
 }
 
 // A client row that expands to show their recent logged workouts.
-function ClientRow({ client }: { client: CoachClient }) {
+function ClientRow({
+  client,
+  unread,
+  onOpenChat,
+}: {
+  client: CoachClient;
+  unread: number;
+  onOpenChat: (c: CoachChat) => void;
+}) {
+  const clientName = client.firstName ?? (client.username ? `@${client.username}` : 'Клиент');
   const [open, setOpen] = useState(false);
   const [workouts, setWorkouts] = useState<WorkoutSummary[] | null>(null);
   const [progress, setProgress] = useState<ProgressEntry[] | null>(null);
@@ -265,20 +304,34 @@ function ClientRow({ client }: { client: CoachClient }) {
 
   return (
     <li className="rounded-2xl bg-tg-secondaryBg p-3">
-      <button className="w-full flex items-center justify-between text-left" onClick={toggle}>
-        <div>
-          <div className="font-medium">
-            {client.firstName ?? 'Клиент'}
-            {client.username && (
-              <span className="text-tg-hint font-normal"> @{client.username}</span>
-            )}
+      <div className="flex items-center gap-2">
+        <button className="flex-1 flex items-center justify-between text-left" onClick={toggle}>
+          <div>
+            <div className="font-medium">
+              {client.firstName ?? 'Клиент'}
+              {client.username && (
+                <span className="text-tg-hint font-normal"> @{client.username}</span>
+              )}
+            </div>
+            {client.goal && <div className="text-tg-hint text-xs">{client.goal}</div>}
           </div>
-          {client.goal && <div className="text-tg-hint text-xs">{client.goal}</div>}
-        </div>
-        <span className="text-tg-hint text-xs">
-          {STATUS_LABEL[client.status]} {open ? '▲' : '▾'}
-        </span>
-      </button>
+          <span className="text-tg-hint text-xs">
+            {STATUS_LABEL[client.status]} {open ? '▲' : '▾'}
+          </span>
+        </button>
+        <button
+          className="relative shrink-0 w-9 h-9 rounded-xl bg-tg-bg flex items-center justify-center"
+          onClick={() => onOpenChat({ clientId: client.id, name: clientName })}
+          aria-label="Чат"
+        >
+          💬
+          {unread > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-brand-accent text-brand-onAccent text-[10px] font-bold flex items-center justify-center">
+              {unread}
+            </span>
+          )}
+        </button>
+      </div>
 
       {open && (
         <div className="mt-3 border-t border-tg-bg pt-3 flex flex-col gap-3">
@@ -313,7 +366,21 @@ function ClientRow({ client }: { client: CoachClient }) {
             </div>
           )}
 
-          <CoachClientNutrition clientId={client.id} />
+          <CoachClientNutrition
+            clientId={client.id}
+            onComment={() =>
+              onOpenChat({
+                clientId: client.id,
+                name: clientName,
+                context: {
+                  contextType: 'nutrition',
+                  contextId: new Date().toISOString().slice(0, 10),
+                  contextLabel: 'Питание клиента',
+                  hint: 'Комментарий прикреплён к дневнику питания клиента.',
+                },
+              })
+            }
+          />
 
           <div className="text-tg-hint text-xs font-medium">Тренировки</div>
           {workouts === null ? (
@@ -375,7 +442,13 @@ function ClientRow({ client }: { client: CoachClient }) {
 }
 
 // Coach view of a client's nutrition: today's totals vs target + set target.
-function CoachClientNutrition({ clientId }: { clientId: string }) {
+function CoachClientNutrition({
+  clientId,
+  onComment,
+}: {
+  clientId: string;
+  onComment?: () => void;
+}) {
   const [day, setDay] = useState<NutritionDay | null>(null);
   const [editing, setEditing] = useState(false);
   const [kcal, setKcal] = useState('');
@@ -424,9 +497,16 @@ function CoachClientNutrition({ clientId }: { clientId: string }) {
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <span className="text-tg-hint text-xs font-medium">Питание (сегодня)</span>
-        <button className="text-tg-link text-xs" onClick={() => setEditing((v) => !v)}>
-          {goal ? 'Изменить цель' : 'Задать цель'}
-        </button>
+        <div className="flex items-center gap-3">
+          {onComment && (
+            <button className="text-brand-accent text-xs" onClick={onComment}>
+              💬 Коммент
+            </button>
+          )}
+          <button className="text-tg-link text-xs" onClick={() => setEditing((v) => !v)}>
+            {goal ? 'Изменить цель' : 'Задать цель'}
+          </button>
+        </div>
       </div>
 
       {t && (

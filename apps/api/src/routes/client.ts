@@ -100,7 +100,16 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
                   exercises: {
                     orderBy: { order: 'asc' },
                     include: {
-                      exercise: { select: { name: true, muscleGroup: true, videoUrl: true } },
+                      exercise: {
+                        select: {
+                          name: true,
+                          muscleGroup: true,
+                          videoUrl: true,
+                          technique: true,
+                          recommendations: true,
+                          precautions: true,
+                        },
+                      },
                     },
                   },
                 },
@@ -128,6 +137,9 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
               name: pe.exercise.name,
               muscleGroup: pe.exercise.muscleGroup,
               videoUrl: pe.exercise.videoUrl,
+              technique: pe.exercise.technique,
+              recommendations: pe.exercise.recommendations,
+              precautions: pe.exercise.precautions,
               sets: pe.sets,
               reps: pe.reps,
               weight: pe.weight,

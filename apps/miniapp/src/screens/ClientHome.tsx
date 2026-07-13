@@ -4,6 +4,7 @@ import {
   type SessionResponse,
   type ClientProgram,
   type ClientProgramDay,
+  type ClientProgramExercise,
   type WorkoutSummary,
   type ClientChallenge,
 } from '../api';
@@ -17,7 +18,9 @@ import { OnboardingForm } from './OnboardingForm';
 import { LineChart } from '../components/LineChart';
 import { LogoMark } from '../components/Logo';
 import { Ring } from '../components/Ring';
-import type { NutritionDay, ProgressEntry } from '../api';
+import { ExerciseDetail } from '../components/ExerciseDetail';
+import { ChatScreen } from '../components/ChatScreen';
+import type { NutritionDay, ProgressEntry, ChatContext } from '../api';
 
 // Client home (Phase 1): assigned program, run a workout, workout history.
 export function ClientHome({ session }: { session: SessionResponse }) {
@@ -27,12 +30,19 @@ export function ClientHome({ session }: { session: SessionResponse }) {
   const [challenges, setChallenges] = useState<ClientChallenge[]>([]);
   const [active, setActive] = useState<{ day: ClientProgramDay; index: number } | null>(null);
   const [view, setView] = useState<
-    'home' | 'progress' | 'checkin' | 'technique' | 'nutrition' | 'health'
+    'home' | 'progress' | 'checkin' | 'technique' | 'nutrition' | 'health' | 'chat'
   >('home');
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [healthEnabled, setHealthEnabled] = useState(false);
   const [nutriDay, setNutriDay] = useState<NutritionDay | null>(null);
   const [progress, setProgress] = useState<ProgressEntry[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [chatContext, setChatContext] = useState<(ChatContext & { hint?: string }) | null>(null);
+
+  function openChat(ctx?: (ChatContext & { hint?: string }) | null) {
+    setChatContext(ctx ?? null);
+    setView('chat');
+  }
 
   function loadHistory() {
     api.clientWorkouts().then(setHistory).catch(() => setHistory([]));
@@ -51,6 +61,7 @@ export function ClientHome({ session }: { session: SessionResponse }) {
     api.healthStatus().then((s) => setHealthEnabled(s.moduleEnabled)).catch(() => setHealthEnabled(false));
     api.nutritionDay().then(setNutriDay).catch(() => setNutriDay(null));
     api.clientProgress().then(setProgress).catch(() => setProgress([]));
+    api.clientUnread().then((r) => setUnread(r.count)).catch(() => setUnread(0));
     loadHistory();
   }, []);
 
@@ -81,11 +92,39 @@ export function ClientHome({ session }: { session: SessionResponse }) {
   }
 
   if (view === 'nutrition') {
-    return <NutritionScreen onBack={() => setView('home')} />;
+    return (
+      <NutritionScreen
+        onBack={() => setView('home')}
+        onComment={(label) =>
+          openChat({
+            contextType: 'nutrition',
+            contextId: new Date().toISOString().slice(0, 10),
+            contextLabel: label,
+            hint: 'Сообщение прикреплено к дневнику питания.',
+          })
+        }
+      />
+    );
   }
 
   if (view === 'health') {
     return <HealthScreen onBack={() => setView('home')} />;
+  }
+
+  if (view === 'chat') {
+    return (
+      <ChatScreen
+        title="Чат с тренером"
+        presetContext={chatContext}
+        load={() => api.clientMessages().then((r) => r.messages)}
+        send={(body, ctx) => api.clientSendMessage(body, ctx)}
+        onBack={() => {
+          setChatContext(null);
+          setView('home');
+          api.clientUnread().then((r) => setUnread(r.count)).catch(() => {});
+        }}
+      />
+    );
   }
 
   return (
@@ -115,6 +154,14 @@ export function ClientHome({ session }: { session: SessionResponse }) {
         <ProgramView
           program={program}
           onStart={(day, index) => setActive({ day, index })}
+          onComment={() =>
+            openChat({
+              contextType: 'program',
+              contextId: program.id,
+              contextLabel: `Программа «${program.name}»`,
+              hint: 'Вопрос прикреплён к вашей программе.',
+            })
+          }
         />
       )}
 
@@ -123,6 +170,18 @@ export function ClientHome({ session }: { session: SessionResponse }) {
       {history.length > 0 && <History items={history} />}
 
       <div className="grid grid-cols-2 gap-3">
+        <button
+          className="relative rounded-2xl bg-tg-secondaryBg p-4 text-center col-span-2"
+          onClick={() => openChat(null)}
+        >
+          <div className="text-base font-medium">💬 Чат с тренером</div>
+          <div className="text-tg-hint text-xs mt-1">вопросы · разбор · поддержка</div>
+          {unread > 0 && (
+            <span className="absolute top-3 right-3 min-w-5 h-5 px-1.5 rounded-full bg-brand-accent text-brand-onAccent text-xs font-bold flex items-center justify-center">
+              {unread}
+            </span>
+          )}
+        </button>
         <button
           className="rounded-2xl bg-tg-secondaryBg p-4 text-center"
           onClick={() => setView('progress')}
@@ -249,16 +308,29 @@ function NoProgram() {
 function ProgramView({
   program,
   onStart,
+  onComment,
 }: {
   program: ClientProgram;
   onStart: (day: ClientProgramDay, index: number) => void;
+  onComment?: () => void;
 }) {
+  const [detail, setDetail] = useState<ClientProgramExercise | null>(null);
   return (
     <section className="flex flex-col gap-3">
-      <div>
-        <h2 className="text-lg font-semibold">{program.name}</h2>
-        {program.description && (
-          <p className="text-tg-hint text-sm">{program.description}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">{program.name}</h2>
+          {program.description && (
+            <p className="text-tg-hint text-sm">{program.description}</p>
+          )}
+        </div>
+        {onComment && (
+          <button
+            className="shrink-0 rounded-xl bg-brand-surface brand-line px-3 py-1.5 text-xs text-brand-accent font-medium"
+            onClick={onComment}
+          >
+            💬 Вопрос по программе
+          </button>
         )}
       </div>
 
@@ -267,24 +339,29 @@ function ProgramView({
           <div className="font-medium">{day.title || `День ${di + 1}`}</div>
           <ul className="flex flex-col gap-2">
             {day.exercises.map((ex) => (
-              <li key={ex.id} className="rounded-xl bg-tg-bg p-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm">{ex.name}</span>
-                  {ex.muscleGroup && (
-                    <span className="text-tg-hint text-xs">{ex.muscleGroup}</span>
-                  )}
-                </div>
-                <div className="text-tg-hint text-xs mt-1">
-                  {[
-                    ex.sets != null && `${ex.sets} подх.`,
-                    ex.reps && `${ex.reps} повт.`,
-                    ex.weight && ex.weight,
-                    ex.restSec != null && `отдых ${ex.restSec}с`,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </div>
-                {ex.notes && <div className="text-tg-hint text-xs mt-1">{ex.notes}</div>}
+              <li key={ex.id}>
+                <button
+                  className="w-full text-left rounded-xl bg-tg-bg p-2 active:opacity-70"
+                  onClick={() => setDetail(ex)}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-sm">{ex.name}</span>
+                    <span className="text-brand-accent text-xs shrink-0 ml-2">
+                      {ex.muscleGroup ? `${ex.muscleGroup} ›` : '›'}
+                    </span>
+                  </div>
+                  <div className="text-tg-hint text-xs mt-1">
+                    {[
+                      ex.sets != null && `${ex.sets} подх.`,
+                      ex.reps && `${ex.reps} повт.`,
+                      ex.weight && ex.weight,
+                      ex.restSec != null && `отдых ${ex.restSec}с`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                  {ex.notes && <div className="text-tg-hint text-xs mt-1">{ex.notes}</div>}
+                </button>
               </li>
             ))}
           </ul>
@@ -298,6 +375,8 @@ function ProgramView({
           )}
         </div>
       ))}
+
+      {detail && <ExerciseDetail ex={detail} onClose={() => setDetail(null)} />}
     </section>
   );
 }

@@ -12,33 +12,38 @@ import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { requireCoach } from '../auth/guards.js';
 import { notifyUser } from '../notify.js';
+import { EXERCISE_LIBRARY } from '../data/exerciseLibrary.js';
 
-// A small starter library so a new coach can build a program immediately.
-// Seeded lazily (once) when no global exercises exist yet.
-const STARTER_EXERCISES: Array<{ name: string; muscleGroup: string }> = [
-  { name: 'Приседания со штангой', muscleGroup: 'Ноги' },
-  { name: 'Жим лёжа', muscleGroup: 'Грудь' },
-  { name: 'Становая тяга', muscleGroup: 'Спина' },
-  { name: 'Жим стоя (армейский)', muscleGroup: 'Плечи' },
-  { name: 'Подтягивания', muscleGroup: 'Спина' },
-  { name: 'Тяга штанги в наклоне', muscleGroup: 'Спина' },
-  { name: 'Выпады с гантелями', muscleGroup: 'Ноги' },
-  { name: 'Жим гантелей сидя', muscleGroup: 'Плечи' },
-  { name: 'Подъём на бицепс', muscleGroup: 'Руки' },
-  { name: 'Разгибания на трицепс', muscleGroup: 'Руки' },
-  { name: 'Румынская тяга', muscleGroup: 'Ноги' },
-  { name: 'Планка', muscleGroup: 'Кор' },
-  { name: 'Скручивания', muscleGroup: 'Кор' },
-  { name: 'Жим ногами', muscleGroup: 'Ноги' },
-  { name: 'Гиперэкстензия', muscleGroup: 'Спина' },
-];
-
+// Sync the global exercise library (spec §7.2): create missing entries and
+// update existing ones with technique / recommendations / precautions. Runs
+// lazily; a version marker (first item having `technique`) short-circuits it.
 async function ensureStarterLibrary(): Promise<void> {
-  const globalCount = await prisma.exercise.count({ where: { ownerCoachId: null } });
-  if (globalCount > 0) return;
-  await prisma.exercise.createMany({
-    data: STARTER_EXERCISES.map((e) => ({ ...e, ownerCoachId: null })),
+  const first = EXERCISE_LIBRARY[0];
+  const marker = await prisma.exercise.findFirst({
+    where: { ownerCoachId: null, name: first.name },
+    select: { technique: true },
   });
+  if (marker?.technique) return; // already synced
+
+  for (const e of EXERCISE_LIBRARY) {
+    const existing = await prisma.exercise.findFirst({
+      where: { ownerCoachId: null, name: e.name },
+      select: { id: true },
+    });
+    const data = {
+      name: e.name,
+      muscleGroup: e.muscleGroup,
+      technique: e.technique,
+      recommendations: e.recommendations,
+      precautions: e.precautions,
+      videoUrl: e.videoUrl ?? null,
+    };
+    if (existing) {
+      await prisma.exercise.update({ where: { id: existing.id }, data });
+    } else {
+      await prisma.exercise.create({ data: { ...data, ownerCoachId: null } });
+    }
+  }
 }
 
 interface ProgramExerciseInput {
@@ -74,35 +79,59 @@ export const programRoutes: FastifyPluginAsync = async (fastify) => {
     const exercises = await prisma.exercise.findMany({
       where: { OR: [{ ownerCoachId: null }, { ownerCoachId: auth.userId }] },
       orderBy: [{ muscleGroup: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true, muscleGroup: true, videoUrl: true, ownerCoachId: true },
+      select: {
+        id: true,
+        name: true,
+        muscleGroup: true,
+        videoUrl: true,
+        technique: true,
+        recommendations: true,
+        precautions: true,
+        ownerCoachId: true,
+      },
     });
     return exercises.map((e) => ({ ...e, custom: e.ownerCoachId === auth.userId }));
   });
 
-  fastify.post<{ Body: { name: string; muscleGroup?: string; videoUrl?: string; instructions?: string } }>(
-    '/coach/exercises',
-    { preHandler: fastify.requireAuth },
-    async (request, reply) => {
-      if (!(await requireCoach(request, reply))) return;
-      const auth = request.auth!;
-      const { name, muscleGroup, videoUrl, instructions } = request.body ?? {};
-      if (!name || !name.trim()) {
-        reply.code(400).send({ error: 'bad_request', reason: 'name_required' });
-        return;
-      }
-      const exercise = await prisma.exercise.create({
-        data: {
-          name: name.trim(),
-          muscleGroup: muscleGroup?.trim() || null,
-          videoUrl: videoUrl?.trim() || null,
-          instructions: instructions?.trim() || null,
-          ownerCoachId: auth.userId,
-        },
-        select: { id: true, name: true, muscleGroup: true, videoUrl: true },
-      });
-      return { ...exercise, custom: true };
-    },
-  );
+  fastify.post<{
+    Body: {
+      name: string;
+      muscleGroup?: string;
+      videoUrl?: string;
+      technique?: string;
+      recommendations?: string;
+      precautions?: string;
+    };
+  }>('/coach/exercises', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    if (!(await requireCoach(request, reply))) return;
+    const auth = request.auth!;
+    const b = request.body ?? ({} as Record<string, string>);
+    if (!b.name || !b.name.trim()) {
+      reply.code(400).send({ error: 'bad_request', reason: 'name_required' });
+      return;
+    }
+    const exercise = await prisma.exercise.create({
+      data: {
+        name: b.name.trim(),
+        muscleGroup: b.muscleGroup?.trim() || null,
+        videoUrl: b.videoUrl?.trim() || null,
+        technique: b.technique?.trim() || null,
+        recommendations: b.recommendations?.trim() || null,
+        precautions: b.precautions?.trim() || null,
+        ownerCoachId: auth.userId,
+      },
+      select: {
+        id: true,
+        name: true,
+        muscleGroup: true,
+        videoUrl: true,
+        technique: true,
+        recommendations: true,
+        precautions: true,
+      },
+    });
+    return { ...exercise, custom: true };
+  });
 
   // ── Programs ────────────────────────────────────────────────────
   fastify.get('/coach/programs', { preHandler: fastify.requireAuth }, async (request, reply) => {

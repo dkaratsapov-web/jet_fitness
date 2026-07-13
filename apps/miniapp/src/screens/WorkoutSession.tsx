@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { api, type ClientProgramDay, type WorkoutSetInput } from '../api';
+import { api, type ClientProgramDay, type ClientProgramExercise, type WorkoutSetInput } from '../api';
+import { ExerciseDetail } from '../components/ExerciseDetail';
 
 // Per-set editable values, keyed by "exerciseId:setNumber".
 interface SetValue {
@@ -46,6 +47,7 @@ export function WorkoutSession({
   const [values, setValues] = useState<Record<string, SetValue>>(() => initialSets(day));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ClientProgramExercise | null>(null);
 
   function patch(key: string, p: Partial<SetValue>) {
     setValues((v) => ({ ...v, [key]: { ...v[key], ...p } }));
@@ -99,7 +101,12 @@ export function WorkoutSession({
         return (
           <div key={ex.id} className="rounded-2xl bg-tg-secondaryBg p-3 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <span className="font-medium text-sm">{ex.name}</span>
+              <button
+                className="font-medium text-sm text-left text-brand-accent active:opacity-70"
+                onClick={() => setDetail(ex)}
+              >
+                {ex.name} <span className="text-xs">ⓘ</span>
+              </button>
               <span className="text-tg-hint text-xs">
                 {ex.reps ?? ''} {ex.weight ? `· ${ex.weight}` : ''}
               </span>
@@ -154,6 +161,8 @@ export function WorkoutSession({
       >
         {saving ? 'Сохраняем…' : 'Завершить тренировку'}
       </button>
+
+      {detail && <ExerciseDetail ex={detail} onClose={() => setDetail(null)} />}
     </div>
   );
 }

@@ -183,8 +183,11 @@ model Exercise {
   ownerCoachId  String?
   name          String
   muscleGroup   String?
-  videoUrl      String?
-  instructions  String?
+  videoUrl      String?  // demonstration video (mp4 link or Object Storage key)
+  instructions  String?  // legacy free-text (kept for back-compat)
+  technique     String?  // how to perform, step by step
+  recommendations String? // reps/tempo/breathing tips
+  precautions   String?  // safety notes, contraindications
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -538,6 +541,29 @@ model ChallengeParticipant {
 
   @@unique([challengeId, clientId])
   @@index([clientId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Messaging: direct coach ↔ client chat + contextual comments
+// ─────────────────────────────────────────────────────────────
+
+// One message in the thread between a coach and a client. A plain message has
+// no context; a "comment" on a program or a nutrition day carries contextType
+// / contextId / contextLabel so the same thread shows discussion in context.
+model Message {
+  id           String    @id @default(cuid())
+  coachId      String    // the coach side of the thread (User id)
+  clientId     String    // the client side of the thread (User id)
+  senderId     String    // author (either the coach or the client)
+  body         String
+  contextType  String?   // "program" | "nutrition" | null (plain message)
+  contextId    String?   // program id, or ISO date for a nutrition day
+  contextLabel String?   // human label shown in the bubble
+  createdAt    DateTime  @default(now())
+  readAt       DateTime?
+
+  @@index([coachId, clientId, createdAt])
+  @@index([contextType, contextId])
 }
 
 // ─────────────────────────────────────────────────────────────

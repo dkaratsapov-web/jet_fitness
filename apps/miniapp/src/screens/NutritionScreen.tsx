@@ -17,7 +17,13 @@ const MEAL_LABELS: Record<MealType, string> = {
 };
 
 // Client nutrition (Phase 2): daily calories & macros vs target + food logging.
-export function NutritionScreen({ onBack }: { onBack: () => void }) {
+export function NutritionScreen({
+  onBack,
+  onComment,
+}: {
+  onBack: () => void;
+  onComment?: (label: string) => void;
+}) {
   const [day, setDay] = useState<NutritionDay | null>(null);
   const [week, setWeek] = useState<NutritionWeek | null>(null);
   const [adding, setAdding] = useState(false);
@@ -43,7 +49,16 @@ export function NutritionScreen({ onBack }: { onBack: () => void }) {
           ← Назад
         </button>
         <h1 className="text-lg font-semibold">Питание</h1>
-        <span className="w-12" />
+        {onComment ? (
+          <button
+            className="text-brand-accent text-xs font-medium"
+            onClick={() => onComment('Питание сегодня')}
+          >
+            💬 Тренеру
+          </button>
+        ) : (
+          <span className="w-12" />
+        )}
       </header>
 
       {t && (
