@@ -380,6 +380,15 @@ export interface OwnerStats {
   suspended: number;
 }
 
+export interface FatSecretDiagnostics {
+  configured: boolean;
+  tokenOk: boolean;
+  tokenStatus: number | null;
+  sampleCount: number;
+  egressIp: string | null;
+  hint: string;
+}
+
 export interface OwnerCoach {
   id: string;
   name: string;
@@ -693,6 +702,8 @@ export const api = {
   coachRevenue: () => request<CoachRevenue>('/api/coach/revenue'),
   ownerRevenue: () => request<OwnerRevenue>('/api/owner/revenue'),
   ownerStats: () => request<OwnerStats>('/api/owner/stats'),
+  ownerDiagnostics: () =>
+    request<{ fatsecret: FatSecretDiagnostics }>('/api/owner/diagnostics'),
   ownerCoaches: () => request<OwnerCoach[]>('/api/owner/coaches'),
   ownerClients: () => request<OwnerClientRow[]>('/api/owner/clients'),
   suspendUser: (id: string, suspended: boolean) =>

@@ -10,11 +10,18 @@ import { prisma } from '@jet/db';
 import { requireOwner } from '../auth/guards.js';
 import { notifyUser } from '../notify.js';
 import { env } from '../env.js';
+import { fatSecretDiagnostics } from '../nutrition/fatsecret.js';
 
 const nameOfUser = (u: { firstName: string | null; username: string | null }) =>
   u.firstName || (u.username ? `@${u.username}` : 'Пользователь');
 
 export const ownerRoutes: FastifyPluginAsync = async (fastify) => {
+  // ── Integrations diagnostics (FatSecret) ────────────────────────
+  fastify.get('/owner/diagnostics', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    if (!(await requireOwner(request, reply))) return;
+    return { fatsecret: await fatSecretDiagnostics() };
+  });
+
   // ── Platform stats ──────────────────────────────────────────────
   fastify.get('/owner/stats', { preHandler: fastify.requireAuth }, async (request, reply) => {
     if (!(await requireOwner(request, reply))) return;

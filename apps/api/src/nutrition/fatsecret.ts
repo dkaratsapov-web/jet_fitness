@@ -105,6 +105,99 @@ function toPer100(parsed: ParsedDescription): Macros | null {
   };
 }
 
+// ── Diagnostics (owner panel) ───────────────────────────────────────
+// Probes the token endpoint and a sample search, surfacing the HTTP status so
+// the owner can tell "bad keys" from "IP not whitelisted". Also reports the
+// function's egress IP — the address to add in FatSecret's IP Restrictions.
+export interface FatSecretDiagnostics {
+  configured: boolean;
+  tokenOk: boolean;
+  tokenStatus: number | null;
+  sampleCount: number;
+  egressIp: string | null;
+  hint: string;
+}
+
+async function egressIp(): Promise<string | null> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 3500);
+  try {
+    const res = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { ip?: string };
+    return j.ip ?? null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+export async function fatSecretDiagnostics(): Promise<FatSecretDiagnostics> {
+  const ip = await egressIp();
+  if (!isFatSecretConfigured()) {
+    return {
+      configured: false,
+      tokenOk: false,
+      tokenStatus: null,
+      sampleCount: 0,
+      egressIp: ip,
+      hint: 'Ключи FatSecret не заданы (FATSECRET_CLIENT_ID/SECRET).',
+    };
+  }
+  // Direct token probe to capture the HTTP status.
+  const basic = Buffer.from(
+    `${env.fatSecretClientId}:${env.fatSecretClientSecret}`,
+  ).toString('base64');
+  let tokenStatus: number | null = null;
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(TOKEN_URL, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Basic ${basic}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        scope: env.fatSecretScope || 'basic',
+      }),
+    });
+    tokenStatus = res.status;
+  } catch {
+    tokenStatus = null;
+  } finally {
+    clearTimeout(t);
+  }
+
+  const token = tokenStatus === 200 ? await getToken() : null;
+  const hits = token ? await searchFatSecret('milk') : [];
+
+  let hint: string;
+  if (tokenStatus === 200 && hits.length > 0) {
+    hint = 'FatSecret подключён и отвечает ✅';
+  } else if (tokenStatus === 200) {
+    hint = 'Токен получен, но поиск пуст — вероятно, egress-IP не в whitelist FatSecret.';
+  } else if (tokenStatus === 401 || tokenStatus === 400) {
+    hint = 'Токен отклонён (401/400) — проверьте Client ID/Secret.';
+  } else if (tokenStatus === 403) {
+    hint = 'Доступ запрещён (403) — добавьте egress-IP ниже в FatSecret → IP Restrictions.';
+  } else {
+    hint = `Не удалось связаться с FatSecret (статус ${tokenStatus ?? 'таймаут'}).`;
+  }
+
+  return {
+    configured: true,
+    tokenOk: tokenStatus === 200,
+    tokenStatus,
+    sampleCount: hits.length,
+    egressIp: ip,
+    hint,
+  };
+}
+
 interface FsFood {
   food_id?: string;
   food_name?: string;

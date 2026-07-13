@@ -6,6 +6,7 @@ import {
   type OwnerStats,
   type OwnerCoach,
   type OwnerClientRow,
+  type FatSecretDiagnostics,
 } from '../api';
 import { RoleSwitch } from '../components/RoleSwitch';
 
@@ -71,7 +72,7 @@ export function OwnerHome({
           </div>
           <p className="text-brand-muted text-[11px]">
             Ты получишь полноценный кабинет роли со своими тестовыми данными.
-            Вернуться — кнопкой «⇄ сменить роль» внизу экрана.
+            Вернуться — кнопкой «⇄ роль» в шапке.
           </p>
         </div>
       )}
@@ -119,6 +120,7 @@ function Overview() {
 
   return (
     <div className="flex flex-col gap-4">
+      <FatSecretStatus />
       {stats && (
         <div className="grid grid-cols-3 gap-3">
           <Stat value={stats.coaches} label="тренеров" />
@@ -154,6 +156,57 @@ function Overview() {
             </ul>
           )}
         </section>
+      )}
+    </div>
+  );
+}
+
+// FatSecret integration status + the egress IP to whitelist. Owner-only.
+function FatSecretStatus() {
+  const [fs, setFs] = useState<FatSecretDiagnostics | null | undefined>(undefined);
+
+  function load() {
+    setFs(undefined);
+    api
+      .ownerDiagnostics()
+      .then((d) => setFs(d.fatsecret))
+      .catch(() => setFs(null));
+  }
+  useEffect(load, []);
+
+  const dot = !fs
+    ? 'var(--muted)'
+    : fs.tokenOk && fs.sampleCount > 0
+      ? 'var(--pos)'
+      : fs.configured
+        ? 'var(--neg)'
+        : 'var(--muted)';
+
+  return (
+    <div className="jf-card p-3 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ background: dot }} />
+          <span className="text-sm font-semibold">FatSecret</span>
+        </div>
+        <button className="text-brand-accent text-xs" onClick={load}>
+          обновить
+        </button>
+      </div>
+      {fs === undefined ? (
+        <p className="text-brand-muted text-xs">Проверяю…</p>
+      ) : fs === null ? (
+        <p className="text-brand-muted text-xs">Не удалось получить статус.</p>
+      ) : (
+        <>
+          <p className="text-xs text-brand-text">{fs.hint}</p>
+          {fs.egressIp && (
+            <div className="rounded-lg bg-tg-bg p-2 text-xs">
+              <span className="text-brand-muted">Egress-IP для whitelist: </span>
+              <span className="font-mono text-brand-accent">{fs.egressIp}</span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
