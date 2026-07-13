@@ -107,6 +107,16 @@ jobs:
             --environment "S3_SECRET=$S3_SECRET" \
             "${EXTRA[@]}"
 
+      # Self-check: hit the deployed API from the runner (which can reach Yandex).
+      - name: Smoke test API
+        env:
+          API_GATEWAY_URL: ${{ secrets.API_GATEWAY_URL }}
+        run: |
+          echo "== GET /health =="
+          curl -s -m 25 -w "\n-> HTTP %{http_code}\n" "$API_GATEWAY_URL/health" || true
+          echo "== GET /api/me (expect 401) =="
+          curl -s -m 25 -w "\n-> HTTP %{http_code}\n" "$API_GATEWAY_URL/api/me" || true
+
       # ── 3. Mini App static -> Object Storage ────────────────
       - name: Build Mini App
         run: npm run build --workspace @jet/miniapp
