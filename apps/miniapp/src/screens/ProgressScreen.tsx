@@ -6,6 +6,7 @@ import {
   type ProgressPhoto,
   type PhotoType,
 } from '../api';
+import { LineChart } from '../components/LineChart';
 
 // Body measurement fields (JSON keys → Russian labels), cm.
 const MEASURES: Array<{ key: string; label: string }> = [
@@ -77,14 +78,24 @@ export function ProgressScreen({ onBack }: { onBack: () => void }) {
       </header>
 
       {latest != null && (
-        <div className="rounded-2xl bg-tg-secondaryBg p-4 flex items-baseline gap-2">
-          <span className="text-3xl font-semibold">{latest}</span>
-          <span className="text-tg-hint">кг</span>
-          {delta != null && delta !== 0 && (
-            <span className={`text-sm ml-2 ${delta < 0 ? 'text-green-500' : 'text-red-400'}`}>
-              {delta > 0 ? '+' : ''}
-              {delta} кг
-            </span>
+        <div className="rounded-2xl bg-tg-secondaryBg p-4 flex flex-col gap-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold">{latest}</span>
+            <span className="text-tg-hint">кг</span>
+            {delta != null && delta !== 0 && (
+              <span className={`text-sm ml-2 ${delta < 0 ? 'text-green-500' : 'text-red-400'}`}>
+                {delta > 0 ? '+' : ''}
+                {delta} кг
+              </span>
+            )}
+          </div>
+          {weights.length >= 2 && (
+            <LineChart
+              unit=" кг"
+              points={[...weights]
+                .reverse()
+                .map((e) => ({ value: e.weightKg as number, label: shortDate(e.date) }))}
+            />
           )}
         </div>
       )}
@@ -276,4 +287,8 @@ function formatDate(iso: string): string {
     month: 'short',
     year: 'numeric',
   });
+}
+
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
