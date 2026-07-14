@@ -614,6 +614,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  updateMeal: (id: string, body: { grams?: number; mealType?: MealType }) =>
+    request<{ ok: boolean }>(`/api/client/nutrition/meals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
   deleteMeal: (id: string) =>
     request<{ ok: boolean }>(`/api/client/nutrition/meals/${id}`, { method: 'DELETE' }),
   searchFoods: (q: string) =>

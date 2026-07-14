@@ -1,0 +1,27 @@
+name: Reminders
+
+# Pings the internal reminders endpoint so supplement/workout nudges go out.
+# NOTE: GitHub `schedule` triggers only run on the repository's DEFAULT branch —
+# this file must be on the default branch (and REMINDERS_SECRET set) for the
+# cron to fire. `workflow_dispatch` lets you run it on demand from any branch.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reminders run
+        env:
+          API_GATEWAY_URL: ${{ secrets.API_GATEWAY_URL }}
+          REMINDERS_SECRET: ${{ secrets.REMINDERS_SECRET }}
+        run: |
+          if [ -z "${REMINDERS_SECRET:-}" ] || [ -z "${API_GATEWAY_URL:-}" ]; then
+            echo "reminders not configured (API_GATEWAY_URL / REMINDERS_SECRET missing) — skipping"
+            exit 0
+          fi
+          curl -sS -m 30 -X POST "$API_GATEWAY_URL/api/internal/reminders/run" \
+            -H "x-reminders-secret: $REMINDERS_SECRET" \
+            -w "\n-> HTTP %{http_code}\n"

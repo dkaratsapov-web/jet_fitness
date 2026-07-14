@@ -3,6 +3,7 @@ import {
   api,
   type NutritionDay,
   type NutritionStats,
+  type NutritionMeal,
   type MealType,
   type FoodSearchItem,
 } from '../api';
@@ -16,7 +17,14 @@ const MEAL_LABELS: Record<MealType, string> = {
   snack: 'Перекус',
 };
 
-const TODAY = new Date().toISOString().slice(0, 10);
+// Local calendar date (YYYY-MM-DD) — NOT UTC. Keying the day on the user's own
+// timezone keeps "Сегодня" aligned with their real day; a UTC-based day made
+// entries seem to vanish once midnight UTC passed but local midnight had not.
+function localDate(d = new Date()): string {
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+const TODAY = localDate();
 
 function shiftDate(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00.000Z`);
@@ -26,7 +34,8 @@ function shiftDate(iso: string, days: number): string {
 function humanDate(iso: string): string {
   if (iso === TODAY) return 'Сегодня';
   if (iso === shiftDate(TODAY, -1)) return 'Вчера';
-  return new Date(`${iso}T00:00:00.000Z`).toLocaleDateString('ru-RU', {
+  // Noon UTC avoids the displayed date rolling to a neighbouring day.
+  return new Date(`${iso}T12:00:00.000Z`).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
   });
@@ -46,6 +55,7 @@ export function NutritionScreen({
   const [day, setDay] = useState<NutritionDay | null>(null);
   const [stats, setStats] = useState<NutritionStats | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<NutritionMeal | null>(null);
 
   function loadDay(d = date) {
     api.nutritionDay(d).then(setDay).catch(() => setDay(null));
@@ -151,9 +161,9 @@ export function NutritionScreen({
                     <div className="text-brand-muted text-xs mb-2">цель задаёт тренер</div>
                   )}
                   <div className="flex gap-2">
-                    <MacroBar label="Б" value={t.protein} goal={goal?.protein} />
-                    <MacroBar label="Ж" value={t.fat} goal={goal?.fat} />
-                    <MacroBar label="У" value={t.carbs} goal={goal?.carbs} />
+                    <MacroBar label="Белки" value={t.protein} goal={goal?.protein} />
+                    <MacroBar label="Жиры" value={t.fat} goal={goal?.fat} />
+                    <MacroBar label="Углеводы" value={t.carbs} goal={goal?.carbs} />
                   </div>
                 </div>
               </div>
@@ -175,16 +185,23 @@ export function NutritionScreen({
             ) : (
               day?.meals.map((m) => (
                 <div key={m.id} className="jf-card p-3 flex items-center justify-between">
-                  <div>
+                  <button
+                    className="flex-1 min-w-0 text-left active:opacity-70"
+                    onClick={() => setEditing(m)}
+                  >
                     <div className="font-medium text-sm">
                       {m.name}{' '}
                       <span className="text-brand-muted font-normal">· {MEAL_LABELS[m.mealType]}</span>
                     </div>
                     <div className="text-brand-muted text-xs">
-                      {m.grams} г · {m.kcal} ккал · Б{m.protein} Ж{m.fat} У{m.carbs}
+                      {m.grams} г · {m.kcal} ккал · Белки {m.protein} · Жиры {m.fat} · Углеводы{' '}
+                      {m.carbs}
                     </div>
-                  </div>
-                  <button className="text-brand-muted text-xs px-1" onClick={() => remove(m.id)}>
+                  </button>
+                  <button
+                    className="text-brand-muted text-xs px-2 py-1 shrink-0"
+                    onClick={() => remove(m.id)}
+                  >
                     ✕
                   </button>
                 </div>
@@ -206,6 +223,159 @@ export function NutritionScreen({
           }}
         />
       )}
+
+      {editing && (
+        <EditMealModal
+          meal={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            reload();
+          }}
+          onDeleted={() => {
+            setEditing(null);
+            reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Edit a previously-logged meal: change the meal slot or the portion (grams).
+// Macros scale from the stored per-portion values, so the preview stays honest.
+function EditMealModal({
+  meal,
+  onClose,
+  onSaved,
+  onDeleted,
+}: {
+  meal: NutritionMeal;
+  onClose: () => void;
+  onSaved: () => void;
+  onDeleted: () => void;
+}) {
+  const [mealType, setMealType] = useState<MealType>(meal.mealType);
+  const [grams, setGrams] = useState<number>(meal.grams);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const per100Kcal = meal.grams > 0 ? (meal.kcal / meal.grams) * 100 : 0;
+  const piece = PIECE_FOODS.find((p) => p.re.test(meal.name));
+  const base = piece ? piece.grams : 100;
+  const kcal = Math.round((per100Kcal * grams) / 100);
+
+  async function save() {
+    if (!grams || grams <= 0) return setError('Укажите граммы');
+    setBusy(true);
+    setError(null);
+    try {
+      await api.updateMeal(meal.id, { grams, mealType });
+      onSaved();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function del() {
+    setBusy(true);
+    try {
+      await api.deleteMeal(meal.id).catch(() => undefined);
+      onDeleted();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50" onClick={onClose}>
+      <div
+        className="bg-tg-bg rounded-t-3xl w-full max-w-md p-4 flex flex-col gap-3 max-h-[88vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Изменить приём пищи</h2>
+          <button className="text-tg-hint" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+
+        <div>
+          <div className="text-sm font-medium">{meal.name}</div>
+          <div className="text-brand-muted text-xs">
+            {Math.round(per100Kcal)} ккал / 100 г
+          </div>
+        </div>
+
+        <div className="grid grid-cols-4 gap-1">
+          {(Object.keys(MEAL_LABELS) as MealType[]).map((mt) => (
+            <button
+              key={mt}
+              className={`rounded-lg py-2 text-xs ${
+                mealType === mt ? 'bg-tg-button text-tg-buttonText' : 'bg-tg-secondaryBg text-tg-hint'
+              }`}
+              onClick={() => setMealType(mt)}
+            >
+              {MEAL_LABELS[mt]}
+            </button>
+          ))}
+        </div>
+
+        {error && <p className="text-red-500 text-sm">{error}</p>}
+
+        <div className="flex gap-1.5 flex-wrap">
+          {FRACTIONS.map((f) => {
+            const g = Math.round(base * f.v);
+            const on = grams === g;
+            return (
+              <button
+                key={f.label}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                  on ? 'bg-brand-accent text-brand-onAccent' : 'bg-brand-surface2 text-brand-muted'
+                }`}
+                onClick={() => setGrams(g)}
+              >
+                {f.label}
+                {piece ? ' шт' : ''}
+              </button>
+            );
+          })}
+        </div>
+        <div className="text-brand-muted text-[10px]">
+          {piece ? `1 шт ≈ ${piece.grams} г (${piece.unit})` : '1 порция = 100 г'}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <input
+              className="w-16 rounded-lg bg-tg-secondaryBg p-2 text-sm outline-none tabular"
+              type="text"
+              inputMode="numeric"
+              value={String(grams)}
+              onChange={(e) => setGrams(Number(numericOnly(e.target.value)) || 0)}
+            />
+            <span className="text-brand-muted text-xs">г</span>
+          </div>
+          <span className="text-brand-muted text-xs flex-1">≈ {kcal} ккал</span>
+        </div>
+
+        <button
+          className="rounded-xl bg-tg-button text-tg-buttonText p-3 font-medium disabled:opacity-60"
+          onClick={save}
+          disabled={busy}
+        >
+          {busy ? 'Сохраняем…' : 'Сохранить'}
+        </button>
+        <button
+          className="rounded-xl text-red-500 p-2 text-sm disabled:opacity-60"
+          onClick={del}
+          disabled={busy}
+        >
+          Удалить позицию
+        </button>
+      </div>
     </div>
   );
 }
@@ -471,6 +641,28 @@ function AddMealModal({
   );
 }
 
+// Approximate per-piece weights so foods like eggs can be counted by unit.
+const PIECE_FOODS: Array<{ re: RegExp; grams: number; unit: string }> = [
+  { re: /яйц|яиц/i, grams: 60, unit: 'яйцо' },
+  { re: /банан/i, grams: 120, unit: 'банан' },
+  { re: /яблок/i, grams: 150, unit: 'яблоко' },
+  { re: /(хлеб|тост|ломт|батон)/i, grams: 30, unit: 'ломтик' },
+  { re: /огур/i, grams: 100, unit: 'огурец' },
+  { re: /(помидор|томат)/i, grams: 90, unit: 'помидор' },
+  { re: /мандарин/i, grams: 60, unit: 'мандарин' },
+  { re: /(апельсин)/i, grams: 180, unit: 'апельсин' },
+];
+
+const FRACTIONS: Array<{ label: string; v: number }> = [
+  { label: '¼', v: 0.25 },
+  { label: '⅓', v: 1 / 3 },
+  { label: '½', v: 0.5 },
+  { label: '⅔', v: 2 / 3 },
+  { label: '1', v: 1 },
+  { label: '1½', v: 1.5 },
+  { label: '2', v: 2 },
+];
+
 function FoodResult({
   food,
   onAdd,
@@ -480,30 +672,61 @@ function FoodResult({
   onAdd: (grams: number) => void;
   busy: boolean;
 }) {
-  const [grams, setGrams] = useState('100');
+  const piece = PIECE_FOODS.find((p) => p.re.test(food.name));
+  const base = piece ? piece.grams : 100;
+  const [grams, setGrams] = useState<number>(piece ? piece.grams : 100);
+  const kcal = Math.round((food.per100.kcal * grams) / 100);
+
   return (
-    <div className="rounded-xl bg-tg-secondaryBg p-3 flex items-center justify-between gap-2">
+    <div className="jf-card p-3 flex flex-col gap-2">
       <div className="min-w-0">
-        <div className="text-sm font-medium truncate">{food.name}</div>
-        <div className="text-tg-hint text-xs">
+        <div className="text-sm font-medium">{food.name}</div>
+        <div className="text-brand-muted text-xs">
           {food.per100.kcal} ккал · Б{food.per100.protein} Ж{food.per100.fat} У{food.per100.carbs} / 100 г
         </div>
       </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <input
-          className="w-14 rounded-lg bg-tg-bg p-2 text-sm outline-none tabular"
-          type="text"
-          inputMode="numeric"
-          value={grams}
-          onChange={(e) => setGrams(numericOnly(e.target.value))}
-        />
-        <span className="text-tg-hint text-xs">г</span>
+
+      {/* fractions of a base portion (1 piece for piece-foods, else 100 г) */}
+      <div className="flex gap-1.5 flex-wrap">
+        {FRACTIONS.map((f) => {
+          const g = Math.round(base * f.v);
+          const on = grams === g;
+          return (
+            <button
+              key={f.label}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                on ? 'bg-brand-accent text-brand-onAccent' : 'bg-brand-surface2 text-brand-muted'
+              }`}
+              onClick={() => setGrams(g)}
+            >
+              {f.label}
+              {piece ? ' шт' : ''}
+            </button>
+          );
+        })}
+      </div>
+      <div className="text-brand-muted text-[10px]">
+        {piece ? `1 шт ≈ ${piece.grams} г (${piece.unit})` : '1 порция = 100 г'}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <input
+            className="w-16 rounded-lg bg-tg-bg p-2 text-sm outline-none tabular"
+            type="text"
+            inputMode="numeric"
+            value={String(grams)}
+            onChange={(e) => setGrams(Number(numericOnly(e.target.value)) || 0)}
+          />
+          <span className="text-brand-muted text-xs">г</span>
+        </div>
+        <span className="text-brand-muted text-xs flex-1">≈ {kcal} ккал</span>
         <button
-          className="rounded-lg bg-tg-button text-tg-buttonText px-3 py-2 text-sm disabled:opacity-60"
-          onClick={() => onAdd(Number(grams) || 0)}
+          className="rounded-lg bg-brand-accent text-brand-onAccent px-4 py-2 text-sm font-semibold disabled:opacity-60"
+          onClick={() => onAdd(grams)}
           disabled={busy || !grams}
         >
-          +
+          Добавить
         </button>
       </div>
     </div>

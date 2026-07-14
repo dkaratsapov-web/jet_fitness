@@ -78,6 +78,8 @@ jobs:
           # used for Vision OCR + YandexGPT). Must hold ai.vision.user +
           # ai.languageModels.user.
           YC_FUNCTION_SA_ID: ${{ secrets.YC_FUNCTION_SA_ID }}
+          # Reminders endpoint secret (scheduled workflow calls it).
+          REMINDERS_SECRET: ${{ secrets.REMINDERS_SECRET }}
           # FatSecret nutrition API (optional). When set, food search uses it
           # first. Requires whitelisting this function's egress IP in FatSecret.
           FATSECRET_CLIENT_ID: ${{ secrets.FATSECRET_CLIENT_ID }}
@@ -121,6 +123,10 @@ jobs:
           YFID="${YANDEX_FOLDER_ID:-$YC_FOLDER_ID}"
           if [ -n "${YFID:-}" ]; then
             EXTRA+=(--environment "YANDEX_FOLDER_ID=$YFID")
+          fi
+
+          if [ -n "${REMINDERS_SECRET:-}" ]; then
+            EXTRA+=(--environment "REMINDERS_SECRET=$REMINDERS_SECRET")
           fi
 
           # FatSecret: only pass when configured (yc rejects empty env values).

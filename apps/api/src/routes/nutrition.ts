@@ -315,6 +315,51 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
     return { ok: true, id: meal.id, name };
   });
 
+  // Edit a logged meal: change grams (macros recomputed from the stored
+  // per-portion) and/or the meal type.
+  fastify.patch<{ Params: { id: string }; Body: { grams?: number; mealType?: string } }>(
+    '/client/nutrition/meals/:id',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      const auth = request.auth!;
+      const meal = await prisma.mealLog.findUnique({ where: { id: request.params.id } });
+      if (!meal || meal.clientId !== auth.userId) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const b = request.body ?? {};
+      const grams = b.grams != null ? Number(b.grams) : meal.grams;
+      const mealType =
+        b.mealType && MEAL_TYPES.includes(b.mealType as MealType)
+          ? (b.mealType as MealType)
+          : meal.mealType;
+      if (!grams || grams <= 0 || meal.grams <= 0) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_grams' });
+        return;
+      }
+      // Per-100g reconstructed from the originally logged macros.
+      const per100 = {
+        kcal: (meal.kcal / meal.grams) * 100,
+        protein: (meal.protein / meal.grams) * 100,
+        fat: (meal.fat / meal.grams) * 100,
+        carbs: (meal.carbs / meal.grams) * 100,
+      };
+      const f = grams / 100;
+      await prisma.mealLog.update({
+        where: { id: meal.id },
+        data: {
+          grams,
+          mealType,
+          kcal: per100.kcal * f,
+          protein: per100.protein * f,
+          fat: per100.fat * f,
+          carbs: per100.carbs * f,
+        },
+      });
+      return { ok: true };
+    },
+  );
+
   fastify.delete<{ Params: { id: string } }>(
     '/client/nutrition/meals/:id',
     { preHandler: fastify.requireAuth },

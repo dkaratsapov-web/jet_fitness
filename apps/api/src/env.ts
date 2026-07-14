@@ -46,6 +46,10 @@ export const env = {
   // the metadata service, no secret); only the folder id is needed. The SA must
   // have roles ai.vision.user and ai.languageModels.user.
   yandexFolderId: optional('YANDEX_FOLDER_ID', ''),
+
+  // Shared secret guarding the internal reminders endpoint (called by a
+  // scheduled GitHub Actions workflow). Reminders are off unless this is set.
+  remindersSecret: optional('REMINDERS_SECRET', ''),
   platformFeePercent: Number(optional('PLATFORM_FEE_PERCENT', '10')),
 
   // FatSecret Platform API (nutrition database). When both are set, food search
