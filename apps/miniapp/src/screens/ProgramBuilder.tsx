@@ -171,7 +171,9 @@ export function ProgramBuilder({
       setError(
         msg.includes('program_has_logs')
           ? 'Программу уже выполняли — структуру нельзя перестроить. Создайте новую версию.'
-          : msg,
+          : msg.includes('unknown_exercise')
+            ? 'Некоторые упражнения устарели. Удалите их и добавьте заново из библиотеки, затем сохраните.'
+            : msg,
       );
     } finally {
       setSaving(false);

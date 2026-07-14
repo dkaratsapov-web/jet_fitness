@@ -92,6 +92,24 @@ interface ProgramInput {
   days: ProgramDayInput[];
 }
 
+// Ensure every referenced exercise exists and is usable by this coach (global
+// library or the coach's own). Returns the list of unknown ids so the caller
+// can return a clean 400 instead of letting a foreign-key error surface as 500.
+async function unknownExerciseIds(body: ProgramInput, coachId: string): Promise<string[]> {
+  const ids = [
+    ...new Set(
+      (body.days ?? []).flatMap((d) => (d.exercises ?? []).map((e) => e.exerciseId).filter(Boolean)),
+    ),
+  ];
+  if (ids.length === 0) return [];
+  const found = await prisma.exercise.findMany({
+    where: { id: { in: ids }, OR: [{ ownerCoachId: null }, { ownerCoachId: coachId }] },
+    select: { id: true },
+  });
+  const ok = new Set(found.map((e) => e.id));
+  return ids.filter((id) => !ok.has(id));
+}
+
 export const programRoutes: FastifyPluginAsync = async (fastify) => {
   // ── Exercise library ────────────────────────────────────────────
   fastify.get('/coach/exercises', { preHandler: fastify.requireAuth }, async (request, reply) => {
@@ -284,6 +302,12 @@ export const programRoutes: FastifyPluginAsync = async (fastify) => {
         reply.code(400).send({ error: 'bad_request', reason: 'name_required' });
         return;
       }
+      await ensureStarterLibrary();
+      const missing = await unknownExerciseIds(body, auth.userId);
+      if (missing.length > 0) {
+        reply.code(400).send({ error: 'bad_request', reason: 'unknown_exercise', missing });
+        return;
+      }
 
       const program = await prisma.program.create({
         data: {
@@ -387,6 +411,12 @@ export const programRoutes: FastifyPluginAsync = async (fastify) => {
       }
       if (!body?.name || !body.name.trim()) {
         reply.code(400).send({ error: 'bad_request', reason: 'name_required' });
+        return;
+      }
+      await ensureStarterLibrary();
+      const missing = await unknownExerciseIds(body, auth.userId);
+      if (missing.length > 0) {
+        reply.code(400).send({ error: 'bad_request', reason: 'unknown_exercise', missing });
         return;
       }
       // Any set logs on this program's exercises? Then we can't rebuild the layout.
