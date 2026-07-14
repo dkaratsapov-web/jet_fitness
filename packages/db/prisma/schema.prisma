@@ -599,6 +599,23 @@ model Notification {
 // Self-logged activity & client-built workouts
 // ─────────────────────────────────────────────────────────────
 
+// Daily wearable / fitness-app metrics. Manual entry now (one row per day);
+// auto-sync from Apple Health / Google Fit can upsert the same rows later.
+model DailyMetric {
+  id           String   @id @default(cuid())
+  clientId     String
+  date         DateTime // day (noon UTC)
+  steps        Int?
+  restingPulse Int?     // bpm
+  sleepMin     Int?     // minutes slept
+  activeKcal   Int?     // active calories burned
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([clientId, date])
+  @@index([clientId, date])
+}
+
 // A client's own activity entry: a cardio session (duration/distance/calories)
 // or a self-built strength workout (exercises JSON: [{name, sets, reps, weight}]).
 model ActivityLog {

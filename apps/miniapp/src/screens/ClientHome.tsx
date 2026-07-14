@@ -17,6 +17,7 @@ import { LabsScreen, SupplementsScreen } from './HealthScreen';
 import { ExerciseLibrary } from './ExerciseLibrary';
 import { ActivityScreen } from './ActivityScreen';
 import { NotificationsScreen } from './NotificationsScreen';
+import { WearableScreen } from './WearableScreen';
 import { OnboardingForm } from './OnboardingForm';
 import { LineChart } from '../components/LineChart';
 import { LogoMark } from '../components/Logo';
@@ -36,6 +37,8 @@ type Overlay =
   | 'library'
   | 'activity'
   | 'notifications'
+  | 'progress'
+  | 'wearable'
   | null;
 
 // Client cabinet: bottom-tab shell (Дом · Питание · Прогресс · Профиль) with a
@@ -48,7 +51,7 @@ export function ClientHome({
   onSwitchRole?: () => void;
 }) {
   const name = session.user.firstName ?? 'спортсмен';
-  const [tab, setTab] = useState<ClientTab>('home');
+  const [tab, setTab] = useState<ClientTab>('workouts');
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [program, setProgram] = useState<ClientProgram | null | undefined>(undefined);
   const [history, setHistory] = useState<WorkoutSummary[]>([]);
@@ -116,6 +119,8 @@ export function ClientHome({
   if (overlay === 'technique') return <TechniqueScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'labs') return <LabsScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'supplements') return <SupplementsScreen onBack={() => setOverlay(null)} />;
+  if (overlay === 'progress') return <ProgressScreen onBack={() => setOverlay(null)} />;
+  if (overlay === 'wearable') return <WearableScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'library') return <ExerciseLibrary mode="client" onBack={() => setOverlay(null)} />;
   if (overlay === 'activity') return <ActivityScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'notifications')
@@ -131,7 +136,7 @@ export function ClientHome({
   // ── Tabbed shell ───────────────────────────────────────────────
   return (
     <div className="min-h-screen pb-24">
-      {tab === 'home' && (
+      {tab === 'workouts' && (
         <HomeTab
           name={name}
           program={program}
@@ -165,14 +170,19 @@ export function ClientHome({
           }
         />
       )}
-      {tab === 'progress' && <ProgressScreen />}
+      {tab === 'health' && (
+        <HealthTab
+          healthEnabled={healthEnabled}
+          onProgress={() => setOverlay('progress')}
+          onWearable={() => setOverlay('wearable')}
+          onLabs={() => setOverlay('labs')}
+          onSupplements={() => setOverlay('supplements')}
+        />
+      )}
       {tab === 'profile' && (
         <ProfileTab
           name={name}
-          healthEnabled={healthEnabled}
           challenges={challenges}
-          onLabs={() => setOverlay('labs')}
-          onSupplements={() => setOverlay('supplements')}
           onLibrary={() => setOverlay('library')}
           onActivity={() => setOverlay('activity')}
           onCheckin={() => setOverlay('checkin')}
@@ -395,7 +405,7 @@ function StatCards({
         </div>
       </button>
 
-      <button className="jf-card p-3.5 flex flex-col gap-2 text-left" onClick={() => onTab('progress')}>
+      <button className="jf-card p-3.5 flex flex-col gap-2 text-left" onClick={() => onTab('health')}>
         <div className="text-brand-muted text-[10px] font-bold uppercase tracking-wide">Вес</div>
         {latest != null ? (
           <>
@@ -519,13 +529,82 @@ function FullProgram({
   );
 }
 
+// ── Health tab (Здоровье): тело, браслет, анализы, бады ──────────
+function HealthTab({
+  healthEnabled,
+  onProgress,
+  onWearable,
+  onLabs,
+  onSupplements,
+}: {
+  healthEnabled: boolean;
+  onProgress: () => void;
+  onWearable: () => void;
+  onLabs: () => void;
+  onSupplements: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <header>
+        <p className="text-brand-accent text-[11px] font-bold uppercase tracking-[0.16em]">Здоровье</p>
+        <h1 className="text-2xl font-semibold mt-0.5">Твои показатели</h1>
+      </header>
+
+      <HealthRow
+        icon="📊"
+        name="Показатели тела"
+        sub="вес · замеры · фото прогресса"
+        onClick={onProgress}
+      />
+      <HealthRow
+        icon="⌚"
+        name="Фитнес-браслет"
+        sub="шаги · пульс · сон · калории"
+        onClick={onWearable}
+      />
+      {healthEnabled ? (
+        <>
+          <HealthRow icon="🧪" name="Анализы" sub="динамика · нормы · распознавание" onClick={onLabs} />
+          <HealthRow icon="💊" name="Бады и добавки" sub="приём · расписание · напоминания" onClick={onSupplements} />
+        </>
+      ) : (
+        <p className="text-brand-muted text-sm">
+          Раздел анализов и добавок включает тренер.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function HealthRow({
+  icon,
+  name,
+  sub,
+  onClick,
+}: {
+  icon: string;
+  name: string;
+  sub: string;
+  onClick: () => void;
+}) {
+  return (
+    <button className="jf-card p-4 flex items-center gap-3 text-left active:scale-[0.99] transition-transform" onClick={onClick}>
+      <span className="w-11 h-11 rounded-2xl shrink-0 grid place-items-center text-xl bg-brand-surface2 brand-line">
+        {icon}
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block font-semibold">{name}</span>
+        <span className="block text-brand-muted text-xs mt-0.5">{sub}</span>
+      </span>
+      <span className="text-brand-accent text-lg">›</span>
+    </button>
+  );
+}
+
 // ── Profile tab ──────────────────────────────────────────────────
 function ProfileTab({
   name,
-  healthEnabled,
   challenges,
-  onLabs,
-  onSupplements,
   onLibrary,
   onActivity,
   onCheckin,
@@ -533,10 +612,7 @@ function ProfileTab({
   onSwitchRole,
 }: {
   name: string;
-  healthEnabled: boolean;
   challenges: ClientChallenge[];
-  onLabs: () => void;
-  onSupplements: () => void;
   onLibrary: () => void;
   onActivity: () => void;
   onCheckin: () => void;
@@ -552,13 +628,6 @@ function ProfileTab({
         </div>
         <LogoMark size={28} className="text-brand-accent" />
       </header>
-
-      {healthEnabled && (
-        <div className="grid grid-cols-2 gap-3">
-          <Chip icon="🧪" name="Анализы" sub="динамика · нормы" onClick={onLabs} />
-          <Chip icon="💊" name="Бады" sub="приём · напоминания" onClick={onSupplements} />
-        </div>
-      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Chip icon="🏋️" name="Тренировки" sub="свои · активность" onClick={onActivity} />

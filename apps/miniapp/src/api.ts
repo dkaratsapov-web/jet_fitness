@@ -314,6 +314,14 @@ export interface ActivityExercise {
   weight?: string;
 }
 
+export interface DailyMetric {
+  date: string;
+  steps: number | null;
+  restingPulse: number | null;
+  sleepMin: number | null;
+  activeKcal: number | null;
+}
+
 export interface ActivityLog {
   id: string;
   date: string;
@@ -810,6 +818,20 @@ export const api = {
     }),
   deleteActivity: (id: string) =>
     request<{ ok: boolean }>(`/api/client/activity/${id}`, { method: 'DELETE' }),
+
+  // Daily wearable / fitness-app metrics (manual now; auto-sync later).
+  metrics: (days = 30) => request<DailyMetric[]>(`/api/client/metrics?days=${days}`),
+  saveMetric: (body: {
+    date?: string;
+    steps?: number | null;
+    restingPulse?: number | null;
+    sleepMin?: number | null;
+    activeKcal?: number | null;
+  }) =>
+    request<{ ok: boolean }>('/api/client/metrics', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   uploadFormVideo: async (file: File) => {
     const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase();
     const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(

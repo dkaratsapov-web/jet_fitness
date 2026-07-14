@@ -1,16 +1,17 @@
-// Client bottom tab-bar (Дом · Питание · Прогресс · Профиль). Fixed to the
-// bottom, blurred graphite bar with a gold active tab.
+// Client bottom tab-bar (Тренировки · Питание · Здоровье · Профиль). Fixed to
+// the bottom, blurred graphite bar with a gold active tab.
 
-export type ClientTab = 'home' | 'nutrition' | 'progress' | 'profile';
+export type ClientTab = 'workouts' | 'nutrition' | 'health' | 'profile';
 
 const TABS: Array<{ key: ClientTab; label: string; icon: JSX.Element }> = [
   {
-    key: 'home',
-    label: 'Дом',
+    key: 'workouts',
+    label: 'Тренировки',
     icon: (
       <svg viewBox="0 0 24 24">
-        <path d="M3 10.5 12 3l9 7.5" />
-        <path d="M5 9.5V21h14V9.5" />
+        <path d="M6.5 6.5v11M17.5 6.5v11" />
+        <path d="M4 9v6M20 9v6" />
+        <path d="M6.5 12h11" />
       </svg>
     ),
   },
@@ -25,12 +26,12 @@ const TABS: Array<{ key: ClientTab; label: string; icon: JSX.Element }> = [
     ),
   },
   {
-    key: 'progress',
-    label: 'Прогресс',
+    key: 'health',
+    label: 'Здоровье',
     icon: (
       <svg viewBox="0 0 24 24">
-        <path d="M4 19V5" />
-        <path d="M4 15l5-4 4 3 7-7" />
+        <path d="M20.8 8.6a5 5 0 0 0-8.8-3.2A5 5 0 0 0 3.2 8.6c0 4.4 6.3 8.9 8.8 10.9 2.5-2 8.8-6.5 8.8-10.9Z" />
+        <path d="M7 12h2.5l1.5-2.5 1.8 4 1.2-2H17" />
       </svg>
     ),
   },
@@ -71,7 +72,7 @@ export function BottomNav({
               {t.icon}
             </span>
             {t.label}
-            {t.key === 'home' && unread ? (
+            {t.key === 'workouts' && unread ? (
               <span className="absolute top-0 right-[26%] min-w-4 h-4 px-1 rounded-full bg-brand-accent text-brand-onAccent text-[9px] font-bold flex items-center justify-center">
                 {unread}
               </span>

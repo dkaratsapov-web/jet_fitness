@@ -146,6 +146,60 @@ export const activityRoutes: FastifyPluginAsync = async (fastify) => {
       return { ok: true };
     },
   );
+
+  // ── Daily wearable / fitness-app metrics (manual entry, one row/day) ──
+  fastify.get<{ Querystring: { days?: string } }>(
+    '/client/metrics',
+    { preHandler: fastify.requireAuth },
+    async (request) => {
+      const auth = request.auth!;
+      const days = Math.min(365, Math.max(1, Number(request.query.days) || 30));
+      const since = new Date(Date.now() - days * 86400000);
+      const rows = await prisma.dailyMetric.findMany({
+        where: { clientId: auth.userId, date: { gte: since } },
+        orderBy: { date: 'desc' },
+      });
+      return rows.map((r) => ({
+        date: r.date.toISOString().slice(0, 10),
+        steps: r.steps,
+        restingPulse: r.restingPulse,
+        sleepMin: r.sleepMin,
+        activeKcal: r.activeKcal,
+      }));
+    },
+  );
+
+  fastify.post<{
+    Body: {
+      date?: string;
+      steps?: number | null;
+      restingPulse?: number | null;
+      sleepMin?: number | null;
+      activeKcal?: number | null;
+    };
+  }>('/client/metrics', { preHandler: fastify.requireAuth }, async (request) => {
+    const auth = request.auth!;
+    const b = request.body ?? {};
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(b.date ?? '')
+      ? new Date(`${b.date}T12:00:00.000Z`)
+      : new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00.000Z`);
+    const clamp = (v: unknown): number | null => {
+      const n = Number(v);
+      return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+    };
+    const data = {
+      steps: clamp(b.steps),
+      restingPulse: clamp(b.restingPulse),
+      sleepMin: clamp(b.sleepMin),
+      activeKcal: clamp(b.activeKcal),
+    };
+    await prisma.dailyMetric.upsert({
+      where: { clientId_date: { clientId: auth.userId, date } },
+      update: data,
+      create: { clientId: auth.userId, date, ...data },
+    });
+    return { ok: true };
+  });
 };
 
 function defaultTitle(type: ActivityType): string {
