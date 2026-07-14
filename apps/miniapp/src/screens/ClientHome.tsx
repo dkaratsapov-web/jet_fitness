@@ -13,7 +13,8 @@ import { ProgressScreen } from './ProgressScreen';
 import { CheckinScreen } from './CheckinScreen';
 import { TechniqueScreen } from './TechniqueScreen';
 import { NutritionScreen } from './NutritionScreen';
-import { HealthScreen } from './HealthScreen';
+import { LabsScreen, SupplementsScreen } from './HealthScreen';
+import { ExerciseLibrary } from './ExerciseLibrary';
 import { OnboardingForm } from './OnboardingForm';
 import { LineChart } from '../components/LineChart';
 import { LogoMark } from '../components/Logo';
@@ -24,7 +25,7 @@ import { BottomNav, type ClientTab } from '../components/BottomNav';
 import { RoleSwitch } from '../components/RoleSwitch';
 import type { NutritionDay, ProgressEntry, ChatContext } from '../api';
 
-type Overlay = 'chat' | 'checkin' | 'technique' | 'health' | null;
+type Overlay = 'chat' | 'checkin' | 'technique' | 'labs' | 'supplements' | 'library' | null;
 
 // Client cabinet: bottom-tab shell (Дом · Питание · Прогресс · Профиль) with a
 // premium home, full-screen overlays for workouts/chat/sub-sections.
@@ -100,7 +101,9 @@ export function ClientHome({
   }
   if (overlay === 'checkin') return <CheckinScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'technique') return <TechniqueScreen onBack={() => setOverlay(null)} />;
-  if (overlay === 'health') return <HealthScreen onBack={() => setOverlay(null)} />;
+  if (overlay === 'labs') return <LabsScreen onBack={() => setOverlay(null)} />;
+  if (overlay === 'supplements') return <SupplementsScreen onBack={() => setOverlay(null)} />;
+  if (overlay === 'library') return <ExerciseLibrary onBack={() => setOverlay(null)} />;
 
   // ── Tabbed shell ───────────────────────────────────────────────
   return (
@@ -120,6 +123,7 @@ export function ClientHome({
           openChat={openChat}
           onCheckin={() => setOverlay('checkin')}
           onTechnique={() => setOverlay('technique')}
+          onLibrary={() => setOverlay('library')}
           needsOnboarding={needsOnboarding}
           onOnboarded={() => setNeedsOnboarding(false)}
         />
@@ -142,7 +146,9 @@ export function ClientHome({
           name={name}
           healthEnabled={healthEnabled}
           challenges={challenges}
-          onHealth={() => setOverlay('health')}
+          onLabs={() => setOverlay('labs')}
+          onSupplements={() => setOverlay('supplements')}
+          onLibrary={() => setOverlay('library')}
           onCheckin={() => setOverlay('checkin')}
           onTechnique={() => setOverlay('technique')}
           onSwitchRole={onSwitchRole}
@@ -169,6 +175,7 @@ function HomeTab({
   openChat,
   onCheckin,
   onTechnique,
+  onLibrary,
   needsOnboarding,
   onOnboarded,
 }: {
@@ -185,6 +192,7 @@ function HomeTab({
   openChat: (ctx?: (ChatContext & { hint?: string }) | null) => void;
   onCheckin: () => void;
   onTechnique: () => void;
+  onLibrary: () => void;
   needsOnboarding: boolean;
   onOnboarded: () => void;
 }) {
@@ -232,7 +240,7 @@ function HomeTab({
       </button>
 
       <div className="jf-rise jf-rise-4 grid grid-cols-3 gap-3">
-        <Chip icon="📈" name="Прогресс" sub="вес · замеры" onClick={() => onTab('progress')} />
+        <Chip icon="📚" name="Библиотека" sub="упражнения" onClick={onLibrary} />
         <Chip icon="📝" name="Check-in" sub="самочувствие" onClick={onCheckin} />
         <Chip icon="🎬" name="Техника" sub="видео-разбор" onClick={onTechnique} />
       </div>
@@ -471,7 +479,9 @@ function ProfileTab({
   name,
   healthEnabled,
   challenges,
-  onHealth,
+  onLabs,
+  onSupplements,
+  onLibrary,
   onCheckin,
   onTechnique,
   onSwitchRole,
@@ -479,7 +489,9 @@ function ProfileTab({
   name: string;
   healthEnabled: boolean;
   challenges: ClientChallenge[];
-  onHealth: () => void;
+  onLabs: () => void;
+  onSupplements: () => void;
+  onLibrary: () => void;
   onCheckin: () => void;
   onTechnique: () => void;
   onSwitchRole?: () => void;
@@ -494,10 +506,15 @@ function ProfileTab({
         <LogoMark size={28} className="text-brand-accent" />
       </header>
 
-      <div className="grid grid-cols-2 gap-3">
-        {healthEnabled && (
-          <Chip icon="🧪" name="Здоровье" sub="анализы · добавки" onClick={onHealth} />
-        )}
+      {healthEnabled && (
+        <div className="grid grid-cols-2 gap-3">
+          <Chip icon="🧪" name="Анализы" sub="динамика · нормы" onClick={onLabs} />
+          <Chip icon="💊" name="Бады" sub="приём · напоминания" onClick={onSupplements} />
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-3">
+        <Chip icon="📚" name="Библиотека" sub="упражнения" onClick={onLibrary} />
         <Chip icon="📝" name="Check-in" sub="самочувствие" onClick={onCheckin} />
         <Chip icon="🎬" name="Техника" sub="видео-разбор" onClick={onTechnique} />
       </div>

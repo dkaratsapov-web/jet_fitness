@@ -683,7 +683,12 @@ export const api = {
       body: JSON.stringify(body),
     }),
   supplements: () => request<Supplement[]>('/api/client/health/supplements'),
-  addSupplement: (body: { name: string; dose?: string; remindersOn?: boolean }) =>
+  addSupplement: (body: {
+    name: string;
+    dose?: string;
+    remindersOn?: boolean;
+    schedule?: { times: string[] };
+  }) =>
     request<{ ok: boolean; id: string }>('/api/client/health/supplements', {
       method: 'POST',
       body: JSON.stringify(body),
