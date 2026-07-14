@@ -24,12 +24,15 @@ interface DraftDay {
 const emptyDay = (): DraftDay => ({ title: '', exercises: [] });
 
 // Program builder (Phase 1): name + days + exercises with sets/reps/weight/rest.
+// Pass `editId` to load an existing program and save changes over it (PUT).
 export function ProgramBuilder({
   onSaved,
   onCancel,
+  editId,
 }: {
   onSaved: () => void;
   onCancel: () => void;
+  editId?: string;
 }) {
   const [library, setLibrary] = useState<ExerciseLite[] | null>(null);
   const [name, setName] = useState('');
@@ -37,10 +40,40 @@ export function ProgramBuilder({
   const [days, setDays] = useState<DraftDay[]>([emptyDay()]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(Boolean(editId));
 
   useEffect(() => {
     api.exercises().then(setLibrary).catch(() => setLibrary([]));
   }, []);
+
+  // Preload the program when editing.
+  useEffect(() => {
+    if (!editId) return;
+    api
+      .programDetail(editId)
+      .then((p) => {
+        setName(p.name);
+        setDescription(p.description ?? '');
+        setDays(
+          p.days.length
+            ? p.days.map((d) => ({
+                title: d.title ?? '',
+                exercises: d.exercises.map((ex) => ({
+                  exerciseId: ex.exerciseId,
+                  name: ex.name,
+                  sets: ex.sets != null ? String(ex.sets) : '',
+                  reps: ex.reps ?? '',
+                  weight: ex.weight ?? '',
+                  restSec: ex.restSec != null ? String(ex.restSec) : '',
+                  notes: ex.notes ?? '',
+                })),
+              }))
+            : [emptyDay()],
+        );
+      })
+      .catch(() => setError('Не удалось загрузить программу'))
+      .finally(() => setLoading(false));
+  }, [editId]);
 
   function addDay() {
     setDays((d) => [...d, emptyDay()]);
@@ -127,13 +160,33 @@ export function ProgramBuilder({
     };
     setSaving(true);
     try {
-      await api.createProgram(draft);
+      if (editId) {
+        await api.updateProgram(editId, draft);
+      } else {
+        await api.createProgram(draft);
+      }
       onSaved();
     } catch (e) {
-      setError(String(e));
+      const msg = String(e);
+      setError(
+        msg.includes('program_has_logs')
+          ? 'Программу уже выполняли — структуру нельзя перестроить. Создайте новую версию.'
+          : msg,
+      );
     } finally {
       setSaving(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-4">
+        <button className="text-tg-link text-sm" onClick={onCancel}>
+          ← Назад
+        </button>
+        <p className="text-tg-hint text-sm mt-4">Загрузка программы…</p>
+      </div>
+    );
   }
 
   return (
@@ -142,7 +195,7 @@ export function ProgramBuilder({
         <button className="text-tg-link text-sm" onClick={onCancel}>
           ← Назад
         </button>
-        <h1 className="text-lg font-semibold">Новая программа</h1>
+        <h1 className="text-lg font-semibold">{editId ? 'Изменить программу' : 'Новая программа'}</h1>
         <span className="w-12" />
       </header>
 

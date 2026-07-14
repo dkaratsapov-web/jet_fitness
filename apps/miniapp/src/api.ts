@@ -126,6 +126,32 @@ export interface ProgramDraft {
   days: ProgramDraftDay[];
 }
 
+// Full program (coach edit view).
+export interface ProgramDetail {
+  id: string;
+  name: string;
+  description: string | null;
+  isTemplate: boolean;
+  days: Array<{
+    id: string;
+    order: number;
+    title: string | null;
+    exercises: Array<{
+      id: string;
+      exerciseId: string;
+      name: string;
+      muscleGroup: string | null;
+      order: number;
+      sets: number | null;
+      reps: string | null;
+      weight: string | null;
+      restSec: number | null;
+      tempo: string | null;
+      notes: string | null;
+    }>;
+  }>;
+}
+
 // Shape returned for a client's active program.
 export interface ClientProgramExercise {
   id: string;
@@ -524,6 +550,12 @@ export const api = {
   createProgram: (draft: ProgramDraft) =>
     request<{ id: string; ok: boolean }>('/api/coach/programs', {
       method: 'POST',
+      body: JSON.stringify(draft),
+    }),
+  programDetail: (id: string) => request<ProgramDetail>(`/api/coach/programs/${id}`),
+  updateProgram: (id: string, draft: ProgramDraft) =>
+    request<{ ok: boolean; id: string }>(`/api/coach/programs/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(draft),
     }),
   deleteProgram: (id: string) =>

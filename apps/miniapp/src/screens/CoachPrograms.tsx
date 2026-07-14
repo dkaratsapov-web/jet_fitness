@@ -8,6 +8,7 @@ export function CoachPrograms() {
   const [programs, setPrograms] = useState<ProgramSummary[] | null>(null);
   const [clients, setClients] = useState<CoachClient[]>([]);
   const [building, setBuilding] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [library, setLibrary] = useState(false);
   const [assignFor, setAssignFor] = useState<ProgramSummary | null>(null);
 
@@ -25,12 +26,17 @@ export function CoachPrograms() {
     return <ExerciseLibrary onBack={() => setLibrary(false)} />;
   }
 
-  if (building) {
+  if (building || editId) {
     return (
       <ProgramBuilder
-        onCancel={() => setBuilding(false)}
+        editId={editId ?? undefined}
+        onCancel={() => {
+          setBuilding(false);
+          setEditId(null);
+        }}
         onSaved={() => {
           setBuilding(false);
+          setEditId(null);
           setPrograms(null);
           reload().catch(() => setPrograms([]));
         }}
@@ -92,12 +98,20 @@ export function CoachPrograms() {
                   </button>
                 )}
               </div>
-              <button
-                className="rounded-xl bg-tg-button text-tg-buttonText px-3 py-2 text-sm self-start"
-                onClick={() => setAssignFor(p)}
-              >
-                Выдать клиенту
-              </button>
+              <div className="flex gap-2">
+                <button
+                  className="rounded-xl bg-tg-button text-tg-buttonText px-3 py-2 text-sm"
+                  onClick={() => setAssignFor(p)}
+                >
+                  Выдать клиенту
+                </button>
+                <button
+                  className="rounded-xl bg-brand-surface2 brand-line text-brand-accent px-3 py-2 text-sm"
+                  onClick={() => setEditId(p.id)}
+                >
+                  ✎ Изменить
+                </button>
+              </div>
             </li>
           ))}
         </ul>

@@ -367,6 +367,70 @@ export const programRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  // Edit a program: replace name/description and its full day/exercise layout.
+  // Restructuring rebuilds days & exercises; that's blocked once the program has
+  // logged workouts (its exercises are referenced by set logs).
+  fastify.put<{ Params: { id: string }; Body: ProgramInput }>(
+    '/coach/programs/:id',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const body = request.body;
+      const program = await prisma.program.findFirst({
+        where: { id: request.params.id, coachId: auth.userId },
+        select: { id: true },
+      });
+      if (!program) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      if (!body?.name || !body.name.trim()) {
+        reply.code(400).send({ error: 'bad_request', reason: 'name_required' });
+        return;
+      }
+      // Any set logs on this program's exercises? Then we can't rebuild the layout.
+      const loggedSets = await prisma.workoutSetLog.count({
+        where: { programExercise: { programDay: { programId: program.id } } },
+      });
+      if (loggedSets > 0) {
+        reply.code(409).send({ error: 'conflict', reason: 'program_has_logs' });
+        return;
+      }
+
+      await prisma.$transaction([
+        prisma.programDay.deleteMany({ where: { programId: program.id } }),
+        prisma.program.update({
+          where: { id: program.id },
+          data: {
+            name: body.name.trim(),
+            description: body.description?.trim() || null,
+            isTemplate: body.isTemplate ?? undefined,
+            days: {
+              create: (body.days ?? []).map((day, di) => ({
+                order: day.order ?? di,
+                title: day.title?.trim() || null,
+                exercises: {
+                  create: (day.exercises ?? []).map((ex, ei) => ({
+                    exerciseId: ex.exerciseId,
+                    order: ex.order ?? ei,
+                    sets: ex.sets ?? null,
+                    reps: ex.reps?.trim() || null,
+                    weight: ex.weight?.trim() || null,
+                    restSec: ex.restSec ?? null,
+                    tempo: ex.tempo?.trim() || null,
+                    notes: ex.notes?.trim() || null,
+                  })),
+                },
+              })),
+            },
+          },
+        }),
+      ]);
+      return { ok: true, id: program.id };
+    },
+  );
+
   fastify.delete<{ Params: { id: string } }>(
     '/coach/programs/:id',
     { preHandler: fastify.requireAuth },
