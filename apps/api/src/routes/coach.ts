@@ -245,7 +245,7 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
       await prisma.formVideoComment.create({
         data: { formVideoId: request.params.id, coachId: auth.userId, body: text },
       });
-      await notifyUser(video.clientId, '🎥 Тренер прокомментировал ваше видео техники.');
+      await notifyUser(video.clientId, '🎥 Тренер прокомментировал ваше видео техники.', { type: 'technique' });
       return { ok: true };
     },
   );
@@ -301,7 +301,7 @@ export const coachRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id: request.params.id },
         data: { coachReply: text, coachRepliedAt: new Date() },
       });
-      await notifyUser(checkin.clientId, '💬 Тренер ответил на ваш check-in. Загляните в приложение.');
+      await notifyUser(checkin.clientId, '💬 Тренер ответил на ваш check-in. Загляните в приложение.', { type: 'checkin' });
       return { ok: true };
     },
   );

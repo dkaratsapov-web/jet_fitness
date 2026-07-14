@@ -19,6 +19,7 @@ import { ownerRoutes } from './routes/owner.js';
 import { clientRoutes } from './routes/client.js';
 import { messageRoutes } from './routes/messages.js';
 import { activityRoutes } from './routes/activity.js';
+import { notificationRoutes } from './routes/notifications.js';
 import { reminderRoutes } from './routes/reminders.js';
 import { telegramRoutes } from './routes/telegram.js';
 import { env } from './env.js';
@@ -97,6 +98,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(clientRoutes, { prefix: '/api' });
   await app.register(messageRoutes, { prefix: '/api' });
   await app.register(activityRoutes, { prefix: '/api' });
+  await app.register(notificationRoutes, { prefix: '/api' });
   await app.register(reminderRoutes, { prefix: '/api' });
 
   // Serverless single-function mode: also handle the Telegram webhook here.

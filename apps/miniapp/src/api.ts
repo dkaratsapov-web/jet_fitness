@@ -481,6 +481,18 @@ export interface OwnerClientRow {
 
 // Coach ↔ client messaging.
 export type MessageContext = 'program' | 'nutrition';
+export interface AppNotification {
+  id: string;
+  type: string;
+  body: string;
+  createdAt: string;
+  read: boolean;
+}
+export interface NotifyPrefs {
+  workout: boolean;
+  supplements: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   body: string;
@@ -634,6 +646,23 @@ export const api = {
       body: JSON.stringify({ body, ...ctx }),
     }),
   clientUnread: () => request<{ count: number }>('/api/client/messages/unread'),
+
+  // In-app notifications center (both roles).
+  notifications: (limit = 40) =>
+    request<AppNotification[]>(`/api/notifications?limit=${limit}`),
+  notificationsUnread: () =>
+    request<{ count: number }>('/api/notifications/unread-count'),
+  markNotificationsRead: (id?: string) =>
+    request<{ ok: boolean }>('/api/notifications/read', {
+      method: 'POST',
+      body: JSON.stringify(id ? { id } : {}),
+    }),
+  notifyPrefs: () => request<NotifyPrefs>('/api/notifications/prefs'),
+  updateNotifyPrefs: (prefs: Partial<NotifyPrefs>) =>
+    request<NotifyPrefs>('/api/notifications/prefs', {
+      method: 'PUT',
+      body: JSON.stringify(prefs),
+    }),
 
   // Client (Phase 1)
   clientProgram: () => request<{ program: ClientProgram | null }>('/api/client/program'),

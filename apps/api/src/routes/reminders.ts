@@ -9,6 +9,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { env } from '../env.js';
 import { notifyUser } from '../notify.js';
+import { readPrefs } from './notifications.js';
 
 const WINDOW_MIN = 20; // match a scheduled time within the last N minutes
 const WORKOUT_HOUR = 19; // evening workout nudge (client-local)
@@ -48,16 +49,18 @@ function parseHM(s: string): number | null {
   return h * 60 + min;
 }
 
-// Fire once per key: create a Notification row, skip if one already exists.
+// Fire once per key: create a Notification row (with body for the in-app
+// center), skip if one already exists. Passes record:false so notifyUser does
+// not create a second row.
 async function once(userId: string, type: string, key: string, text: string): Promise<boolean> {
   const existing = await prisma.notification.count({
     where: { userId, type, payload: { path: ['key'], equals: key } },
   });
   if (existing > 0) return false;
   await prisma.notification.create({
-    data: { userId, type, payload: { key }, sentAt: new Date() },
+    data: { userId, type, payload: { key, body: text }, sentAt: new Date() },
   });
-  await notifyUser(userId, text);
+  await notifyUser(userId, text, { record: false });
   return true;
 }
 
@@ -80,18 +83,24 @@ export const reminderRoutes: FastifyPluginAsync = async (fastify) => {
     // ── Supplement reminders ─────────────────────────────────────
     const supps = await prisma.supplementLog.findMany({ where: { remindersOn: true } });
     const tzCache = new Map<string, string>();
-    async function tzOf(clientId: string): Promise<string> {
-      if (tzCache.has(clientId)) return tzCache.get(clientId)!;
-      const u = await prisma.user.findUnique({ where: { id: clientId }, select: { timezone: true } });
-      const tz = u?.timezone || 'UTC';
-      tzCache.set(clientId, tz);
-      return tz;
+    const prefCache = new Map<string, { workout: boolean; supplements: boolean }>();
+    async function ctxOf(clientId: string): Promise<{ tz: string; prefs: { workout: boolean; supplements: boolean } }> {
+      if (!tzCache.has(clientId) || !prefCache.has(clientId)) {
+        const u = await prisma.user.findUnique({
+          where: { id: clientId },
+          select: { timezone: true, notifyPrefs: true },
+        });
+        tzCache.set(clientId, u?.timezone || 'UTC');
+        prefCache.set(clientId, readPrefs(u?.notifyPrefs));
+      }
+      return { tz: tzCache.get(clientId)!, prefs: prefCache.get(clientId)! };
     }
 
     for (const s of supps) {
       const times = (s.schedule as { times?: string[] } | null)?.times;
       if (!Array.isArray(times) || times.length === 0) continue;
-      const tz = await tzOf(s.clientId);
+      const { tz, prefs } = await ctxOf(s.clientId);
+      if (!prefs.supplements) continue;
       const { minutes, dateKey } = localTime(tz, now);
       for (const raw of times) {
         const sched = parseHM(String(raw));
@@ -120,7 +129,8 @@ export const reminderRoutes: FastifyPluginAsync = async (fastify) => {
     for (const clientId of clientIds) {
       const hasAssignment = await prisma.assignment.count({ where: { clientId, active: true } });
       if (!hasAssignment) continue;
-      const tz = await tzOf(clientId);
+      const { tz, prefs } = await ctxOf(clientId);
+      if (!prefs.workout) continue;
       const { minutes, dateKey } = localTime(tz, now);
       const target = WORKOUT_HOUR * 60;
       if (!(target <= minutes && target > minutes - WINDOW_MIN)) continue;

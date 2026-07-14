@@ -32,13 +32,38 @@ export async function notify(telegramId: bigint | string, text: string): Promise
   }
 }
 
-/** Resolve a User id → Telegram id, then notify. */
-export async function notifyUser(userId: string, text: string): Promise<void> {
+/** Persist a notification for the in-app center. Never throws. */
+export async function recordNotification(
+  userId: string,
+  type: string,
+  body: string,
+  extra?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await prisma.notification.create({
+      data: { userId, type, payload: { body, ...(extra ?? {}) }, sentAt: new Date() },
+    });
+  } catch {
+    // Best-effort: the in-app center must never break the underlying action.
+  }
+}
+
+/**
+ * Resolve a User id → Telegram id, push a message, and (by default) record it
+ * in the in-app notifications center. Pass { record: false } when the caller
+ * already persisted the row (e.g. the reminders runner dedupes its own).
+ */
+export async function notifyUser(
+  userId: string,
+  text: string,
+  opts: { record?: boolean; type?: string } = {},
+): Promise<void> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { telegramId: true },
   });
   if (user) await notify(user.telegramId, text);
+  if (opts.record !== false) await recordNotification(userId, opts.type ?? 'general', text);
 }
 
 /** Notify all of a client's active coaches. */

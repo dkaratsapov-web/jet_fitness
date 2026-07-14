@@ -125,7 +125,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
       const label = ctx.contextLabel ? ` (${ctx.contextLabel})` : '';
-      await notifyUser(coachId, `💬 Сообщение от клиента${label}. Откройте приложение, чтобы ответить.`);
+      await notifyUser(coachId, `💬 Сообщение от клиента${label}. Откройте приложение, чтобы ответить.`, { type: 'chat' });
       return serialize(msg, auth.userId);
     },
   );
@@ -198,7 +198,7 @@ export const messageRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
       const label = ctx.contextLabel ? ` (${ctx.contextLabel})` : '';
-      await notifyUser(clientId, `💬 Сообщение от тренера${label}. Загляните в приложение.`);
+      await notifyUser(clientId, `💬 Сообщение от тренера${label}. Загляните в приложение.`, { type: 'chat' });
       return serialize(msg, auth.userId);
     },
   );

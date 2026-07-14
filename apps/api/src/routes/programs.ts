@@ -503,6 +503,7 @@ export const programRoutes: FastifyPluginAsync = async (fastify) => {
       await notifyUser(
         clientId,
         `🏋️ Тренер выдал вам новую программу «${program.name}». Откройте приложение, чтобы начать.`,
+        { type: 'program' },
       );
       return { ok: true, assignmentId: assignment.id, startDate: assignment.startDate };
     },

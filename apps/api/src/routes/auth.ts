@@ -126,7 +126,7 @@ async function bindInvite(
     select: { firstName: true, username: true },
   });
   const who = client?.firstName || (client?.username ? `@${client.username}` : 'Новый клиент');
-  await notifyUser(invite.coachId, `🎉 ${who} присоединился(ась) к вам по приглашению.`);
+  await notifyUser(invite.coachId, `🎉 ${who} присоединился(ась) к вам по приглашению.`, { type: 'client_joined' });
 }
 
 async function resolveUserAndRoles(userId: string) {

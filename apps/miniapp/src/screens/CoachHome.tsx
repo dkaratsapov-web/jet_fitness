@@ -20,6 +20,7 @@ import { CoachChallenges } from './CoachChallenges';
 import { ChatScreen } from '../components/ChatScreen';
 import { LogoMark } from '../components/Logo';
 import { RoleSwitch } from '../components/RoleSwitch';
+import { NotificationsScreen } from './NotificationsScreen';
 
 const STATUS_LABEL: Record<CoachClient['status'], string> = {
   pending: 'ожидает',
@@ -48,6 +49,12 @@ export function CoachHome({
   const name = session.user.firstName ?? 'тренер';
   const [tab, setTab] = useState<Tab>('clients');
   const [chat, setChat] = useState<CoachChat | null>(null);
+  const [notifications, setNotifications] = useState(false);
+  const [notiUnread, setNotiUnread] = useState(0);
+
+  useEffect(() => {
+    api.notificationsUnread().then((r) => setNotiUnread(r.count)).catch(() => setNotiUnread(0));
+  }, []);
 
   if (chat) {
     return (
@@ -58,6 +65,17 @@ export function CoachHome({
         load={() => api.coachClientMessages(chat.clientId).then((r) => r.messages)}
         send={(body, ctx) => api.coachSendMessage(chat.clientId, body, ctx)}
         onBack={() => setChat(null)}
+      />
+    );
+  }
+
+  if (notifications) {
+    return (
+      <NotificationsScreen
+        onBack={() => {
+          setNotifications(false);
+          setNotiUnread(0);
+        }}
       />
     );
   }
@@ -73,6 +91,21 @@ export function CoachHome({
           <hr className="jf-rule mt-2 w-24" />
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            className="relative w-9 h-9 rounded-xl grid place-items-center bg-brand-surface brand-line text-brand-accent"
+            onClick={() => setNotifications(true)}
+            aria-label="Уведомления"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.7 21a2 2 0 01-3.4 0" />
+            </svg>
+            {notiUnread > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-accent text-brand-onAccent text-[10px] font-bold grid place-items-center">
+                {notiUnread > 9 ? '9+' : notiUnread}
+              </span>
+            )}
+          </button>
           <RoleSwitch onClick={onSwitchRole} />
           <LogoMark size={30} className="text-brand-accent" />
         </div>

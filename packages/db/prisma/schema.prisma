@@ -106,6 +106,8 @@ model User {
   username   String?
   firstName  String?
   timezone   String   @default("UTC")
+  // Per-user notification switches, e.g. { workout: true, supplements: true }.
+  notifyPrefs Json?
   // Platform moderation: a suspended user is blocked at auth (owner exempt).
   suspended  Boolean  @default(false)
   createdAt  DateTime @default(now())

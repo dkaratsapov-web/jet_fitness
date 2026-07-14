@@ -16,6 +16,7 @@ import { NutritionScreen } from './NutritionScreen';
 import { LabsScreen, SupplementsScreen } from './HealthScreen';
 import { ExerciseLibrary } from './ExerciseLibrary';
 import { ActivityScreen } from './ActivityScreen';
+import { NotificationsScreen } from './NotificationsScreen';
 import { OnboardingForm } from './OnboardingForm';
 import { LineChart } from '../components/LineChart';
 import { LogoMark } from '../components/Logo';
@@ -34,6 +35,7 @@ type Overlay =
   | 'supplements'
   | 'library'
   | 'activity'
+  | 'notifications'
   | null;
 
 // Client cabinet: bottom-tab shell (Дом · Питание · Прогресс · Профиль) with a
@@ -57,6 +59,7 @@ export function ClientHome({
   const [nutriDay, setNutriDay] = useState<NutritionDay | null>(null);
   const [progress, setProgress] = useState<ProgressEntry[]>([]);
   const [unread, setUnread] = useState(0);
+  const [notiUnread, setNotiUnread] = useState(0);
   const [chatContext, setChatContext] = useState<(ChatContext & { hint?: string }) | null>(null);
 
   function loadHistory() {
@@ -71,6 +74,7 @@ export function ClientHome({
     api.nutritionDay().then(setNutriDay).catch(() => setNutriDay(null));
     api.clientProgress().then(setProgress).catch(() => setProgress([]));
     api.clientUnread().then((r) => setUnread(r.count)).catch(() => setUnread(0));
+    api.notificationsUnread().then((r) => setNotiUnread(r.count)).catch(() => setNotiUnread(0));
     loadHistory();
   }, []);
 
@@ -114,6 +118,15 @@ export function ClientHome({
   if (overlay === 'supplements') return <SupplementsScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'library') return <ExerciseLibrary mode="client" onBack={() => setOverlay(null)} />;
   if (overlay === 'activity') return <ActivityScreen onBack={() => setOverlay(null)} />;
+  if (overlay === 'notifications')
+    return (
+      <NotificationsScreen
+        onBack={() => {
+          setOverlay(null);
+          setNotiUnread(0);
+        }}
+      />
+    );
 
   // ── Tabbed shell ───────────────────────────────────────────────
   return (
@@ -134,6 +147,8 @@ export function ClientHome({
           onTechnique={() => setOverlay('technique')}
           onLibrary={() => setOverlay('library')}
           onActivity={() => setOverlay('activity')}
+          onNotifications={() => setOverlay('notifications')}
+          notiUnread={notiUnread}
           needsOnboarding={needsOnboarding}
           onOnboarded={() => setNeedsOnboarding(false)}
         />
@@ -187,6 +202,8 @@ function HomeTab({
   onTechnique,
   onLibrary,
   onActivity,
+  onNotifications,
+  notiUnread,
   needsOnboarding,
   onOnboarded,
 }: {
@@ -204,6 +221,8 @@ function HomeTab({
   onTechnique: () => void;
   onLibrary: () => void;
   onActivity: () => void;
+  onNotifications: () => void;
+  notiUnread: number;
   needsOnboarding: boolean;
   onOnboarded: () => void;
 }) {
@@ -217,6 +236,21 @@ function HomeTab({
           <h1 className="text-2xl font-semibold mt-0.5">Привет, {name}!</h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            className="relative w-9 h-9 rounded-xl grid place-items-center bg-brand-surface brand-line text-brand-accent"
+            onClick={onNotifications}
+            aria-label="Уведомления"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.7 21a2 2 0 01-3.4 0" />
+            </svg>
+            {notiUnread > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-accent text-brand-onAccent text-[10px] font-bold grid place-items-center">
+                {notiUnread > 9 ? '9+' : notiUnread}
+              </span>
+            )}
+          </button>
           <RoleSwitch onClick={onSwitchRole} />
           <LogoMark size={28} className="text-brand-accent" />
         </div>

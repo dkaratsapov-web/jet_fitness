@@ -139,7 +139,7 @@ export const challengeRoutes: FastifyPluginAsync = async (fastify) => {
     });
     await Promise.all(
       [...allowed].map((clientId) =>
-        notifyUser(clientId, `🏆 Вас добавили в челлендж «${b.name!.trim()}». Удачи!`),
+        notifyUser(clientId, `🏆 Вас добавили в челлендж «${b.name!.trim()}». Удачи!`, { type: 'challenge' }),
       ),
     );
     return { ok: true, id: challenge.id };

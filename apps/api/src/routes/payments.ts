@@ -66,6 +66,7 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
     await notifyUser(
       request.params.id,
       `💳 Тренер оформил подписку «${planName.trim()}» — ${amount} ₽ на ${periodDays} дн.`,
+      { type: 'payment' },
     );
     return { ok: true, id: sub.id };
   });
