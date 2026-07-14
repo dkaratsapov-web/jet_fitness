@@ -13,6 +13,30 @@ resource "yandex_vpc_subnet" "this" {
   zone           = var.zone
   network_id     = yandex_vpc_network.this.id
   v4_cidr_blocks = ["10.10.0.0/24"]
+  route_table_id = yandex_vpc_route_table.egress.id
+}
+
+# ── Static egress IP ─────────────────────────────────────────
+# A shared egress NAT gateway gives the subnet (and any function attached to the
+# network) a STATIC outbound public IP. Serverless functions otherwise egress
+# from a rotating pool, which breaks IP whitelisting on third-party APIs like
+# FatSecret. Attach the function to the network (deploy passes --network-id) and
+# whitelist the gateway's IP once. Read the IP from the owner diagnostics card
+# (or `curl https://api.ipify.org` from the function) after the first attached
+# deploy — it stays constant afterwards.
+resource "yandex_vpc_gateway" "egress" {
+  name = "jet-fitness-egress"
+  shared_egress_gateway {}
+}
+
+resource "yandex_vpc_route_table" "egress" {
+  name       = "jet-fitness-egress-rt"
+  network_id = yandex_vpc_network.this.id
+
+  static_route {
+    destination_prefix = "0.0.0.0/0"
+    gateway_id         = yandex_vpc_gateway.egress.id
+  }
 }
 
 # ── Service account + roles ──────────────────────────────────
@@ -27,6 +51,7 @@ locals {
     "serverless.functions.admin",   # CI: create/update function versions
     "storage.admin",                # create buckets + set public-read on the app bucket
     "logging.writer",               # function logs
+    "vpc.user",                     # attach the function to the VPC (static egress IP)
   ]
 }
 

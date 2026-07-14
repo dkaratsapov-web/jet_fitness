@@ -37,3 +37,18 @@ Worker.
    BotFather (шаг 8).
 
 Дальше каждый пуш в `main` деплоит автоматически.
+
+## Статичный egress-IP для FatSecret
+
+FatSecret требует whitelisting IP, а у serverless-функции Yandex исходящий IP
+**плавает** (пул адресов) — поэтому один добавленный IP перестаёт совпадать.
+Решение — привязать функцию к сети через NAT-шлюз со статичным IP:
+
+1. `terraform apply` в `infra/yandex/terraform` — создаёт egress-NAT-gateway,
+   route table и роль `vpc.user` (уже в конфиге).
+2. `terraform output -raw network_id` → задать секрет **`YC_NETWORK_ID`**.
+3. Запустить workflow «Deploy» — функция цепляется к сети (`--network-id`).
+4. Открыть в боте карточку диагностики владельца (или `curl https://api.ipify.org`
+   из функции) — теперь IP **постоянный**. Добавить его в whitelist FatSecret.
+
+Без `YC_NETWORK_ID` деплой работает по-старому (динамический IP).

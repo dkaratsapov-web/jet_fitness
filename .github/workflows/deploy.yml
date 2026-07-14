@@ -78,6 +78,7 @@ jobs:
           # used for Vision OCR + YandexGPT). Must hold ai.vision.user +
           # ai.languageModels.user.
           YC_FUNCTION_SA_ID: ${{ secrets.YC_FUNCTION_SA_ID }}
+          YC_NETWORK_ID: ${{ secrets.YC_NETWORK_ID }}
           # Reminders endpoint secret (scheduled workflow calls it).
           REMINDERS_SECRET: ${{ secrets.REMINDERS_SECRET }}
           # FatSecret nutrition API (optional). When set, food search uses it
@@ -149,6 +150,14 @@ jobs:
           if [ -n "$FUNC_SA_ID" ]; then
             SA_ARGS+=(--service-account-id "$FUNC_SA_ID")
             echo "function runtime SA: $FUNC_SA_ID"
+          fi
+
+          # Attach the function to the VPC so it egresses via the static NAT
+          # gateway IP (whitelisted in FatSecret). Only when YC_NETWORK_ID is set;
+          # requires vpc.user on the runtime SA (granted in terraform).
+          if [ -n "${YC_NETWORK_ID:-}" ]; then
+            SA_ARGS+=(--network-id "$YC_NETWORK_ID")
+            echo "function attached to network: $YC_NETWORK_ID"
           fi
 
           CREATE_ARGS=(

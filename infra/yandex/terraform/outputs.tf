@@ -61,3 +61,8 @@ output "pg_host" {
   value       = yandex_mdb_postgresql_cluster.main.host[0].fqdn
   description = "PostgreSQL host FQDN (for manual migrations)."
 }
+
+output "network_id" {
+  value       = yandex_vpc_network.this.id
+  description = "YC_NETWORK_ID secret — attaches the function for a static egress IP (FatSecret whitelist)."
+}
