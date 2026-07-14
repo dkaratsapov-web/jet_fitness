@@ -2,16 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type ExerciseLite } from '../api';
 import { ExerciseDetail } from '../components/ExerciseDetail';
 
-// Coach exercise-library manager: browse the full library, preview technique,
-// and attach a demonstration video to each exercise (upload a file to Object
-// Storage or paste an external link).
-export function ExerciseLibrary({ onBack }: { onBack: () => void }) {
+// Exercise library. In coach mode: browse the full library, preview technique,
+// and attach a demonstration video. In client mode: read-only browse of the
+// global library (no upload), with an optional "add to workout" picker action.
+export function ExerciseLibrary({
+  onBack,
+  mode = 'coach',
+  onPick,
+}: {
+  onBack: () => void;
+  mode?: 'coach' | 'client';
+  onPick?: (ex: ExerciseLite) => void;
+}) {
   const [items, setItems] = useState<ExerciseLite[] | null>(null);
   const [query, setQuery] = useState('');
   const [detail, setDetail] = useState<ExerciseLite | null>(null);
 
   function load() {
-    api.exercises().then(setItems).catch(() => setItems([]));
+    const p = mode === 'client' ? api.clientExercises() : api.exercises();
+    p.then(setItems).catch(() => setItems([]));
   }
   useEffect(load, []);
 
@@ -55,7 +64,9 @@ export function ExerciseLibrary({ onBack }: { onBack: () => void }) {
                 <ExerciseRow
                   key={ex.id}
                   ex={ex}
+                  mode={mode}
                   onPreview={() => setDetail(ex)}
+                  onPick={onPick ? () => onPick(ex) : undefined}
                   onChanged={load}
                 />
               ))}
@@ -71,11 +82,15 @@ export function ExerciseLibrary({ onBack }: { onBack: () => void }) {
 
 function ExerciseRow({
   ex,
+  mode,
   onPreview,
+  onPick,
   onChanged,
 }: {
   ex: ExerciseLite;
+  mode: 'coach' | 'client';
   onPreview: () => void;
+  onPick?: () => void;
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -126,15 +141,24 @@ function ExerciseRow({
             {ex.hasVideo ? '🎬 видео есть' : 'видео нет'} · нажмите для разбора
           </div>
         </button>
-        <button
-          className="shrink-0 rounded-xl bg-tg-bg px-3 py-1.5 text-xs text-brand-accent font-medium"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {ex.hasVideo ? 'Заменить видео' : '+ Видео'}
-        </button>
+        {mode === 'coach' ? (
+          <button
+            className="shrink-0 rounded-xl bg-tg-bg px-3 py-1.5 text-xs text-brand-accent font-medium"
+            onClick={() => setOpen((v) => !v)}
+          >
+            {ex.hasVideo ? 'Заменить видео' : '+ Видео'}
+          </button>
+        ) : onPick ? (
+          <button
+            className="shrink-0 rounded-xl bg-brand-accent text-brand-onAccent px-3 py-1.5 text-xs font-semibold"
+            onClick={onPick}
+          >
+            + В тренировку
+          </button>
+        ) : null}
       </div>
 
-      {open && (
+      {mode === 'coach' && open && (
         <div className="flex flex-col gap-2 border-t brand-line pt-2">
           <input
             ref={fileRef}

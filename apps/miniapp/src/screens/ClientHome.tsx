@@ -15,6 +15,7 @@ import { TechniqueScreen } from './TechniqueScreen';
 import { NutritionScreen } from './NutritionScreen';
 import { LabsScreen, SupplementsScreen } from './HealthScreen';
 import { ExerciseLibrary } from './ExerciseLibrary';
+import { ActivityScreen } from './ActivityScreen';
 import { OnboardingForm } from './OnboardingForm';
 import { LineChart } from '../components/LineChart';
 import { LogoMark } from '../components/Logo';
@@ -25,7 +26,15 @@ import { BottomNav, type ClientTab } from '../components/BottomNav';
 import { RoleSwitch } from '../components/RoleSwitch';
 import type { NutritionDay, ProgressEntry, ChatContext } from '../api';
 
-type Overlay = 'chat' | 'checkin' | 'technique' | 'labs' | 'supplements' | 'library' | null;
+type Overlay =
+  | 'chat'
+  | 'checkin'
+  | 'technique'
+  | 'labs'
+  | 'supplements'
+  | 'library'
+  | 'activity'
+  | null;
 
 // Client cabinet: bottom-tab shell (Дом · Питание · Прогресс · Профиль) with a
 // premium home, full-screen overlays for workouts/chat/sub-sections.
@@ -103,7 +112,8 @@ export function ClientHome({
   if (overlay === 'technique') return <TechniqueScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'labs') return <LabsScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'supplements') return <SupplementsScreen onBack={() => setOverlay(null)} />;
-  if (overlay === 'library') return <ExerciseLibrary onBack={() => setOverlay(null)} />;
+  if (overlay === 'library') return <ExerciseLibrary mode="client" onBack={() => setOverlay(null)} />;
+  if (overlay === 'activity') return <ActivityScreen onBack={() => setOverlay(null)} />;
 
   // ── Tabbed shell ───────────────────────────────────────────────
   return (
@@ -121,9 +131,9 @@ export function ClientHome({
           onSwitchRole={onSwitchRole}
           onTab={setTab}
           openChat={openChat}
-          onCheckin={() => setOverlay('checkin')}
           onTechnique={() => setOverlay('technique')}
           onLibrary={() => setOverlay('library')}
+          onActivity={() => setOverlay('activity')}
           needsOnboarding={needsOnboarding}
           onOnboarded={() => setNeedsOnboarding(false)}
         />
@@ -149,6 +159,7 @@ export function ClientHome({
           onLabs={() => setOverlay('labs')}
           onSupplements={() => setOverlay('supplements')}
           onLibrary={() => setOverlay('library')}
+          onActivity={() => setOverlay('activity')}
           onCheckin={() => setOverlay('checkin')}
           onTechnique={() => setOverlay('technique')}
           onSwitchRole={onSwitchRole}
@@ -173,9 +184,9 @@ function HomeTab({
   onSwitchRole,
   onTab,
   openChat,
-  onCheckin,
   onTechnique,
   onLibrary,
+  onActivity,
   needsOnboarding,
   onOnboarded,
 }: {
@@ -190,9 +201,9 @@ function HomeTab({
   onSwitchRole?: () => void;
   onTab: (t: ClientTab) => void;
   openChat: (ctx?: (ChatContext & { hint?: string }) | null) => void;
-  onCheckin: () => void;
   onTechnique: () => void;
   onLibrary: () => void;
+  onActivity: () => void;
   needsOnboarding: boolean;
   onOnboarded: () => void;
 }) {
@@ -240,8 +251,8 @@ function HomeTab({
       </button>
 
       <div className="jf-rise jf-rise-4 grid grid-cols-3 gap-3">
+        <Chip icon="🏋️" name="Тренировка" sub="своя · активность" onClick={onActivity} />
         <Chip icon="📚" name="Библиотека" sub="упражнения" onClick={onLibrary} />
-        <Chip icon="📝" name="Check-in" sub="самочувствие" onClick={onCheckin} />
         <Chip icon="🎬" name="Техника" sub="видео-разбор" onClick={onTechnique} />
       </div>
 
@@ -482,6 +493,7 @@ function ProfileTab({
   onLabs,
   onSupplements,
   onLibrary,
+  onActivity,
   onCheckin,
   onTechnique,
   onSwitchRole,
@@ -492,6 +504,7 @@ function ProfileTab({
   onLabs: () => void;
   onSupplements: () => void;
   onLibrary: () => void;
+  onActivity: () => void;
   onCheckin: () => void;
   onTechnique: () => void;
   onSwitchRole?: () => void;
@@ -513,7 +526,8 @@ function ProfileTab({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Chip icon="🏋️" name="Тренировки" sub="свои · активность" onClick={onActivity} />
         <Chip icon="📚" name="Библиотека" sub="упражнения" onClick={onLibrary} />
         <Chip icon="📝" name="Check-in" sub="самочувствие" onClick={onCheckin} />
         <Chip icon="🎬" name="Техника" sub="видео-разбор" onClick={onTechnique} />

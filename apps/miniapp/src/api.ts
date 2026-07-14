@@ -272,6 +272,34 @@ export interface Supplement {
   takenToday: number;
 }
 
+export type ActivityType =
+  | 'strength'
+  | 'cardio'
+  | 'run'
+  | 'walk'
+  | 'cycle'
+  | 'swim'
+  | 'other';
+
+export interface ActivityExercise {
+  name: string;
+  sets?: number;
+  reps?: string;
+  weight?: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  date: string;
+  type: ActivityType;
+  title: string;
+  durationMin: number | null;
+  distanceKm: number | null;
+  calories: number | null;
+  notes: string | null;
+  exercises: ActivityExercise[] | null;
+}
+
 export type ChallengeType = 'steps' | 'workouts' | 'weight' | 'custom';
 
 export interface LeaderRow {
@@ -490,6 +518,8 @@ export const api = {
       `/api/coach/exercises/${exerciseId}/video`,
       { method: 'POST', body: JSON.stringify({ videoUrl }) },
     ),
+  // Client-facing read-only library (global exercises only).
+  clientExercises: () => request<ExerciseLite[]>('/api/client/exercises'),
   programs: () => request<ProgramSummary[]>('/api/coach/programs'),
   createProgram: (draft: ProgramDraft) =>
     request<{ id: string; ok: boolean }>('/api/coach/programs', {
@@ -699,6 +729,26 @@ export const api = {
     request<{ ok: boolean }>(`/api/client/health/supplements/${id}`, { method: 'DELETE' }),
   exportHealth: () => request<unknown>('/api/client/health/export'),
   deleteAllHealth: () => request<{ ok: boolean }>('/api/client/health', { method: 'DELETE' }),
+
+  // Client-logged activity & self-built workouts.
+  activity: (days = 60) =>
+    request<ActivityLog[]>(`/api/client/activity?days=${days}`),
+  addActivity: (body: {
+    type: ActivityType;
+    title?: string;
+    date?: string;
+    durationMin?: number;
+    distanceKm?: number;
+    calories?: number;
+    notes?: string;
+    exercises?: ActivityExercise[];
+  }) =>
+    request<{ ok: boolean; id: string }>('/api/client/activity', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  deleteActivity: (id: string) =>
+    request<{ ok: boolean }>(`/api/client/activity/${id}`, { method: 'DELETE' }),
   uploadFormVideo: async (file: File) => {
     const ext = (file.name.split('.').pop() ?? 'mp4').toLowerCase();
     const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(

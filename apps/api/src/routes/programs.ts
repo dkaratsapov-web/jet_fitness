@@ -120,6 +120,32 @@ export const programRoutes: FastifyPluginAsync = async (fastify) => {
     }));
   });
 
+  // ── Client: read-only exercise library ──────────────────────────
+  // Clients browse the global library (no coach-owned custom exercises, no
+  // edit/upload). Used by the client cabinet and the self-workout builder.
+  fastify.get('/client/exercises', { preHandler: fastify.requireAuth }, async () => {
+    await ensureStarterLibrary();
+    const exercises = await prisma.exercise.findMany({
+      where: { ownerCoachId: null },
+      orderBy: [{ muscleGroup: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        muscleGroup: true,
+        videoUrl: true,
+        technique: true,
+        recommendations: true,
+        precautions: true,
+      },
+    });
+    return exercises.map((e) => ({
+      ...e,
+      videoUrl: videoViewUrl(e.videoUrl),
+      hasVideo: Boolean(e.videoUrl),
+      custom: false,
+    }));
+  });
+
   // ── Attach a demonstration video to an exercise ─────────────────
   // Two ways: upload a file to Object Storage (presign → confirm) or set an
   // external link (e.g. YouTube). A coach may enrich their own exercises and

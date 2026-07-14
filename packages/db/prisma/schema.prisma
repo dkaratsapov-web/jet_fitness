@@ -86,6 +86,16 @@ enum ChallengeType {
   custom
 }
 
+enum ActivityType {
+  strength
+  cardio
+  run
+  walk
+  cycle
+  swim
+  other
+}
+
 // ─────────────────────────────────────────────────────────────
 // Identity & roles
 // ─────────────────────────────────────────────────────────────
@@ -581,4 +591,26 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Self-logged activity & client-built workouts
+// ─────────────────────────────────────────────────────────────
+
+// A client's own activity entry: a cardio session (duration/distance/calories)
+// or a self-built strength workout (exercises JSON: [{name, sets, reps, weight}]).
+model ActivityLog {
+  id          String       @id @default(cuid())
+  clientId    String
+  date        DateTime
+  type        ActivityType @default(strength)
+  title       String
+  durationMin Int?
+  distanceKm  Float?
+  calories    Int?
+  notes       String?
+  exercises   Json?
+  createdAt   DateTime     @default(now())
+
+  @@index([clientId, date])
 }
