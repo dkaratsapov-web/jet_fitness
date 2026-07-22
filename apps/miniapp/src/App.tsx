@@ -5,7 +5,7 @@ import { CoachHome } from './screens/CoachHome';
 import { ClientHome } from './screens/ClientHome';
 import { OwnerHome } from './screens/OwnerHome';
 import { RolePicker } from './screens/RolePicker';
-import { Logo } from './components/Logo';
+import { WelcomeScreen } from './screens/WelcomeScreen';
 
 type State =
   | { phase: 'loading' }
@@ -129,41 +129,9 @@ export function App() {
 
   const { session } = state;
 
-  // Account has no role yet: offer to become a coach, or explain client invites.
+  // Account has no role yet: cinematic welcome + the two entry CTAs.
   if (session.roles.length === 0) {
-    return (
-      <Centered>
-        <div className="text-center max-w-xs flex flex-col gap-5">
-          <div className="flex flex-col items-center gap-3">
-            <Logo height={64} />
-            <p className="text-brand-muted text-sm">
-              Твой тренер и весь прогресс — в одном приложении. Тренер ведёт
-              подопечных, ты тренируешься, следишь за питанием и результатом.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3">
-            <button
-              className="rounded-2xl bg-brand-accent text-brand-onAccent p-4 font-semibold disabled:opacity-60"
-              onClick={becomeCoach}
-              disabled={busy}
-            >
-              {busy ? 'Создаём кабинет…' : 'Я тренер — создать кабинет'}
-            </button>
-            <button
-              className="rounded-2xl bg-brand-surface brand-line p-4 font-medium disabled:opacity-60"
-              onClick={becomeClient}
-              disabled={busy}
-            >
-              {busy ? 'Входим…' : 'Я клиент — войти'}
-            </button>
-          </div>
-          <p className="text-brand-muted text-xs">
-            Получил ссылку-приглашение от тренера? Просто открой её — попадёшь
-            сразу к своему тренеру.
-          </p>
-        </div>
-      </Centered>
-    );
+    return <WelcomeScreen onCoach={becomeCoach} onClient={becomeClient} busy={busy} />;
   }
 
   // Multi-role account: let the user choose which context to enter.

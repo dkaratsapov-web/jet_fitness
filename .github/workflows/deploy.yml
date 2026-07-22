@@ -220,6 +220,12 @@ jobs:
           curl -fsSL --max-time 30 \
             "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260713_220341_65918d8c-f4e0-4486-b1a8-df21cc2b34a2.png" \
             -o apps/miniapp/public/brand/app-bg.png && echo "background fetched" || echo "background fetch skipped"
+          # Cinematic welcome hero (athlete in white JET FITNESS kit, generated
+          # with Higgsfield). Same rationale: fetched on the runner; the welcome
+          # screen falls back to the graphite gradient if it is missing.
+          curl -fsSL --max-time 40 \
+            "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260722_203429_f01b989e-f61b-4345-a0aa-93e2334f80dc.png" \
+            -o apps/miniapp/public/brand/hero.png && echo "hero fetched" || echo "hero fetch skipped"
           # Approved exercise demo video(s), hosted on our own storage.
           mkdir -p apps/miniapp/public/exercises
           curl -fsSL --max-time 60 \
