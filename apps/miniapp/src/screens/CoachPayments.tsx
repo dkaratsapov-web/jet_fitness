@@ -109,6 +109,7 @@ function SubRow({ sub, onChanged }: { sub: Subscription; onChanged: () => void }
           <div className="font-medium">{sub.clientName}</div>
           <div className="text-tg-hint text-xs">
             {sub.planName} · {sub.amount} ₽ / {sub.periodDays} дн.
+            {sub.workouts ? ` · ${sub.workouts} трен.` : ''}
           </div>
           <div className="text-tg-hint text-xs">
             {STATUS_LABEL[sub.status]}
@@ -156,6 +157,7 @@ function NewSubModal({
   const [planName, setPlanName] = useState('');
   const [amount, setAmount] = useState('');
   const [periodDays, setPeriodDays] = useState('30');
+  const [workouts, setWorkouts] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -170,6 +172,7 @@ function NewSubModal({
         planName: planName.trim(),
         amount: Number(amount),
         periodDays: Number(periodDays) || 30,
+        workouts: workouts ? Number(workouts) : undefined,
       });
       onCreated();
     } catch (e) {
@@ -217,17 +220,17 @@ function NewSubModal({
           value={planName}
           onChange={(e) => setPlanName(e.target.value)}
         />
+        <label className="flex flex-col gap-1">
+          <span className="text-tg-hint text-xs">Сумма, ₽</span>
+          <input
+            className="rounded-xl bg-tg-secondaryBg p-3 outline-none"
+            inputMode="numeric"
+            placeholder="5000"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+        </label>
         <div className="grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1">
-            <span className="text-tg-hint text-xs">Сумма, ₽</span>
-            <input
-              className="rounded-xl bg-tg-secondaryBg p-3 outline-none"
-              inputMode="numeric"
-              placeholder="5000"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </label>
           <label className="flex flex-col gap-1">
             <span className="text-tg-hint text-xs">Период, дней</span>
             <input
@@ -235,6 +238,16 @@ function NewSubModal({
               inputMode="numeric"
               value={periodDays}
               onChange={(e) => setPeriodDays(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-tg-hint text-xs">Тренировок</span>
+            <input
+              className="rounded-xl bg-tg-secondaryBg p-3 outline-none"
+              inputMode="numeric"
+              placeholder="напр. 12"
+              value={workouts}
+              onChange={(e) => setWorkouts(e.target.value.replace(/[^0-9]/g, ''))}
             />
           </label>
         </div>

@@ -28,19 +28,32 @@ const toMajor = (minor: number) => Math.round(minor) / 100;
 const feePercent = () => (Number.isFinite(env.platformFeePercent) ? env.platformFeePercent : 10);
 const commissionOf = (minor: number) => Math.round((minor * feePercent()) / 100);
 
+// Russian plural for "тренировка": 1 → тренировка, 2–4 → тренировки, else тренировок.
+function workoutWord(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'тренировка';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'тренировки';
+  return 'тренировок';
+}
+
 export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
   // ── Create a subscription for a client ──────────────────────────
   fastify.post<{
     Params: { id: string };
-    Body: { planName: string; amount: number; periodDays: number };
+    Body: { planName: string; amount: number; periodDays: number; workouts?: number };
   }>('/coach/clients/:id/subscriptions', { preHandler: fastify.requireAuth }, async (request, reply) => {
     if (!(await requireCoach(request, reply))) return;
     const auth = request.auth!;
-    const { planName, amount, periodDays } = request.body ?? ({} as never);
+    const { planName, amount, periodDays, workouts } = request.body ?? ({} as never);
     if (!planName?.trim() || !amount || amount <= 0 || !periodDays || periodDays <= 0) {
       reply.code(400).send({ error: 'bad_request', reason: 'invalid_subscription' });
       return;
     }
+    const workoutsCount =
+      workouts != null && Number.isFinite(Number(workouts)) && Number(workouts) > 0
+        ? Math.round(Number(workouts))
+        : null;
     const link = await prisma.coachClient.findUnique({
       where: { coachId_clientId: { coachId: auth.userId, clientId: request.params.id } },
       select: { id: true },
@@ -58,14 +71,16 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
         amount: toMinor(amount),
         currency: CURRENCY,
         periodDays,
+        workouts: workoutsCount,
         status: 'active',
         currentPeriodEnd,
       },
       select: { id: true },
     });
+    const workoutsNote = workoutsCount ? `, ${workoutsCount} ${workoutWord(workoutsCount)}` : '';
     await notifyUser(
       request.params.id,
-      `💳 Тренер оформил подписку «${planName.trim()}» — ${amount} ₽ на ${periodDays} дн.`,
+      `💳 Тренер оформил подписку «${planName.trim()}» — ${amount} ₽ на ${periodDays} дн.${workoutsNote}`,
       { type: 'payment' },
     );
     return { ok: true, id: sub.id };
@@ -97,6 +112,7 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
       planName: s.planName,
       amount: toMajor(s.amount),
       periodDays: s.periodDays,
+      workouts: s.workouts,
       status: s.status,
       currentPeriodEnd: s.currentPeriodEnd,
       paidTotal: toMajor(s.payments.reduce((n, p) => n + p.amount, 0)),

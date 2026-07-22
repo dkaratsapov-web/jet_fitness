@@ -472,6 +472,7 @@ model Subscription {
   amount           Int                // minor units (e.g. kopecks/cents)
   currency         String
   periodDays       Int
+  workouts         Int?               // trainings included in the plan (null = unlimited/not set)
   status           SubscriptionStatus @default(active)
   currentPeriodEnd DateTime?
   createdAt        DateTime           @default(now())

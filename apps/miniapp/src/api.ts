@@ -429,6 +429,7 @@ export interface Subscription {
   planName: string;
   amount: number;
   periodDays: number;
+  workouts: number | null;
   status: 'active' | 'past_due' | 'canceled';
   currentPeriodEnd: string | null;
   paidTotal: number;
@@ -878,7 +879,7 @@ export const api = {
   coachSubscriptions: () => request<Subscription[]>('/api/coach/subscriptions'),
   createSubscription: (
     clientId: string,
-    body: { planName: string; amount: number; periodDays: number },
+    body: { planName: string; amount: number; periodDays: number; workouts?: number },
   ) =>
     request<{ ok: boolean; id: string }>(`/api/coach/clients/${clientId}/subscriptions`, {
       method: 'POST',
