@@ -3,7 +3,7 @@
 // (brand/preloader.mp4); if it is missing we fall back to the still hero image,
 // and if that is missing too, to the graphite gradient. Nothing ever breaks.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Logo } from './Logo';
 import { getFirstName } from '../telegram';
 
@@ -26,12 +26,30 @@ function pickIndex(): number {
 export function Preloader() {
   const name = getFirstName();
   const [idx] = useState(pickIndex);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const base = import.meta.env.BASE_URL;
   const VIDEO = `${base}brand/preloader-${idx}.mp4`;
   const POSTER = `${base}brand/preloader-${idx}.png`;
+
+  // iOS/Telegram won't autoplay unless the element is *really* muted before
+  // play() — React's `muted` prop doesn't reliably set the attribute, so force
+  // it via the ref and kick off playback (ignoring the promise rejection).
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = true;
+    v.defaultMuted = true;
+    v.setAttribute('muted', '');
+    const tryPlay = () => v.play().catch(() => {});
+    tryPlay();
+    v.addEventListener('canplay', tryPlay, { once: true });
+    return () => v.removeEventListener('canplay', tryPlay);
+  }, [idx]);
+
   return (
     <div className="fixed inset-0 overflow-hidden bg-brand-bg">
       <video
+        ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover"
         src={VIDEO}
         poster={POSTER}
@@ -40,6 +58,7 @@ export function Preloader() {
         loop
         playsInline
         preload="auto"
+        webkit-playsinline="true"
       />
       {/* Graphite scrim so the logo + ring always read clearly */}
       <div
