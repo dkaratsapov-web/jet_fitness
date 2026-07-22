@@ -795,7 +795,11 @@ export const api = {
       body: JSON.stringify(body),
     }),
   clientProgress: () => request<ProgressEntry[]>('/api/client/progress'),
+  deleteProgress: (id: string) =>
+    request<{ ok: boolean }>(`/api/client/progress/${id}`, { method: 'DELETE' }),
   clientPhotos: () => request<ProgressPhoto[]>('/api/client/progress-photos'),
+  deleteProgressPhoto: (id: string) =>
+    request<{ ok: boolean }>(`/api/client/progress-photos/${id}`, { method: 'DELETE' }),
   clientProfile: () => request<ClientProfile>('/api/client/profile'),
   updateProfile: (body: {
     goal?: string;

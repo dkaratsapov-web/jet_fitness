@@ -382,6 +382,25 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
     return listProgress(auth.userId);
   });
 
+  // Delete one of the client's own measurements.
+  fastify.delete<{ Params: { id: string } }>(
+    '/client/progress/:id',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      const auth = request.auth!;
+      const entry = await prisma.progressEntry.findUnique({
+        where: { id: request.params.id },
+        select: { clientId: true },
+      });
+      if (!entry || entry.clientId !== auth.userId) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      await prisma.progressEntry.delete({ where: { id: request.params.id } });
+      return { ok: true };
+    },
+  );
+
   // ── Progress photos (Object Storage, presigned upload) ──────────
   // 1) ask for an upload URL, 2) PUT the file straight to storage,
   // 3) confirm to persist the object key.
@@ -431,6 +450,25 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
         select: { id: true },
       });
       return { ok: true, id: photo.id };
+    },
+  );
+
+  // Delete one of the client's own progress photos.
+  fastify.delete<{ Params: { id: string } }>(
+    '/client/progress-photos/:id',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      const auth = request.auth!;
+      const photo = await prisma.progressPhoto.findUnique({
+        where: { id: request.params.id },
+        select: { clientId: true },
+      });
+      if (!photo || photo.clientId !== auth.userId) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      await prisma.progressPhoto.delete({ where: { id: request.params.id } });
+      return { ok: true };
     },
   );
 

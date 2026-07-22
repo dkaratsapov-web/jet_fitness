@@ -99,7 +99,7 @@ export function ProgressScreen({ onBack }: { onBack?: () => void }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {cards.map((c) => (
-              <EntryCard key={c.date} card={c} />
+              <EntryCard key={c.date} card={c} onChanged={load} />
             ))}
           </ul>
         )}
@@ -272,8 +272,9 @@ function groupByDate(entries: ProgressEntry[], photos: ProgressPhoto[]): DayCard
   return [...map.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
-function EntryCard({ card }: { card: DayCard }) {
+function EntryCard({ card, onChanged }: { card: DayCard; onChanged: () => void }) {
   const e = card.entry;
+  const [busy, setBusy] = useState(false);
   const meas =
     e?.measurements && Object.keys(e.measurements).length > 0
       ? MEASURES.filter((m) => e.measurements?.[m.key] != null)
@@ -283,30 +284,76 @@ function EntryCard({ card }: { card: DayCard }) {
   const photos = [...card.photos].sort(
     (a, b) => PHOTO_TYPES.indexOf(a.type) - PHOTO_TYPES.indexOf(b.type),
   );
+
+  async function delEntry() {
+    if (!e || busy) return;
+    if (!confirm('Удалить этот замер?')) return;
+    setBusy(true);
+    try {
+      await api.deleteProgress(e.id);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function delPhoto(id: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api.deleteProgressPhoto(id);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <li className="jf-card p-3 flex flex-col gap-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-brand-muted text-xs">{formatDate(card.date)}</span>
-        <span className="font-semibold tabular">
-          {e?.weightKg != null ? `${e.weightKg} кг` : ''}
-          {e?.bodyFatPct != null ? ` · ${e.bodyFatPct}% жира` : ''}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold tabular">
+            {e?.weightKg != null ? `${e.weightKg} кг` : ''}
+            {e?.bodyFatPct != null ? ` · ${e.bodyFatPct}% жира` : ''}
+          </span>
+          {e && (
+            <button
+              className="text-brand-muted text-sm px-1 disabled:opacity-40"
+              onClick={delEntry}
+              disabled={busy}
+              aria-label="Удалить замер"
+              title="Удалить замер"
+            >
+              🗑
+            </button>
+          )}
+        </div>
       </div>
       {meas && <div className="text-brand-muted text-xs">{meas}</div>}
       {photos.length > 0 && (
         <div className="grid grid-cols-3 gap-2">
           {photos.map((p) =>
             p.viewUrl ? (
-              <a key={p.id} href={p.viewUrl} target="_blank" rel="noreferrer" className="block">
-                <img
-                  src={p.viewUrl}
-                  alt={PHOTO_LABELS[p.type]}
-                  className="w-full aspect-square object-cover rounded-lg"
-                />
-                <div className="text-brand-muted text-[9px] mt-1 text-center">
-                  {PHOTO_LABELS[p.type]}
-                </div>
-              </a>
+              <div key={p.id} className="relative">
+                <a href={p.viewUrl} target="_blank" rel="noreferrer" className="block">
+                  <img
+                    src={p.viewUrl}
+                    alt={PHOTO_LABELS[p.type]}
+                    className="w-full aspect-square object-cover rounded-lg"
+                  />
+                  <div className="text-brand-muted text-[9px] mt-1 text-center">
+                    {PHOTO_LABELS[p.type]}
+                  </div>
+                </a>
+                <button
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs grid place-items-center disabled:opacity-40"
+                  onClick={() => delPhoto(p.id)}
+                  disabled={busy}
+                  aria-label="Удалить фото"
+                >
+                  ✕
+                </button>
+              </div>
             ) : null,
           )}
         </div>
