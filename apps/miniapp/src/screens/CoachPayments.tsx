@@ -85,6 +85,7 @@ export function CoachPayments() {
 }
 
 function SubRow({ sub, onChanged }: { sub: Subscription; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const remaining = Math.max(0, sub.amount - sub.paidTotal);
@@ -115,22 +116,26 @@ function SubRow({ sub, onChanged }: { sub: Subscription; onChanged: () => void }
 
   return (
     <Card className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
+      <button className="flex items-center gap-3 text-left" onClick={() => setOpen((v) => !v)}>
         <Avatar name={sub.clientName} size={38} />
         <div className="flex-1 min-w-0">
           <div className="font-semibold leading-tight truncate">{sub.clientName}</div>
           <div className="text-brand-muted text-xs leading-snug">
-            {sub.planName} · {sub.amount.toLocaleString('ru-RU')} ₽ / {sub.periodDays} дн.
+            {sub.workouts ? `${sub.sessionsUsed}/${sub.workouts} трен. · ` : ''}
+            {sub.paidTotal.toLocaleString('ru-RU')}/{sub.amount.toLocaleString('ru-RU')} ₽
           </div>
         </div>
-        <Chip tone={statusTone} className="shrink-0 self-start">
+        <Chip tone={statusTone} className="shrink-0">
           {STATUS_LABEL[sub.status]}
         </Chip>
-      </div>
+        <span className="text-brand-muted text-xs shrink-0 w-3">{open ? '▲' : '▾'}</span>
+      </button>
 
+      {!open ? null : (
+        <>
       {sub.currentPeriodEnd && (
         <div className="text-brand-muted text-[11px] -mt-1">
-          действует до{' '}
+          {sub.planName} · {sub.amount.toLocaleString('ru-RU')} ₽ / {sub.periodDays} дн. · действует до{' '}
           {new Date(sub.currentPeriodEnd).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
         </div>
       )}
@@ -232,6 +237,8 @@ function SubRow({ sub, onChanged }: { sub: Subscription; onChanged: () => void }
               Отменить
             </button>
           </div>
+        </>
+      )}
         </>
       )}
     </Card>

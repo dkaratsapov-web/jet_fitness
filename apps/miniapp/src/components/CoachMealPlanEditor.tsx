@@ -59,10 +59,20 @@ function recompute(r: Row): Row {
   return r;
 }
 
+const WEEKDAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+function dayLabel(offset: number): { wd: string; num: number } {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return { wd: WEEKDAYS[d.getDay()], num: d.getDate() };
+}
+
 export function CoachMealPlanEditor({ clientId }: { clientId: string }) {
-  const [when, setWhen] = useState<0 | 1>(0);
-  const date = ymd(when);
+  const [mode, setMode] = useState<'day' | 'week'>('day');
+  const [offset, setOffset] = useState(0);
+  const date = ymd(offset);
   const draftKey = `jf.mealplan.${clientId}.${date}`;
+  const [copying, setCopying] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const [rows, setRows] = useState<Row[]>([]);
   const [note, setNote] = useState('');
@@ -194,19 +204,90 @@ export function CoachMealPlanEditor({ clientId }: { clientId: string }) {
     }
   }
 
+  // Save the current items/note to all 7 days of the coming week.
+  async function copyWeek() {
+    setCopying(true);
+    setCopied(false);
+    try {
+      const items = rows
+        .filter((r) => r.title.trim())
+        .map((r) => ({
+          mealType: r.mealType,
+          title: r.title.trim(),
+          grams: r.grams ? Number(r.grams) : null,
+          kcal: r.kcal,
+          protein: r.protein,
+          fat: r.fat,
+          carbs: r.carbs,
+        }));
+      for (let o = 0; o < 7; o++) {
+        const d = ymd(o);
+        await api.saveMealPlan(clientId, { date: d, note: note.trim() || null, items });
+        try {
+          localStorage.removeItem(`jf.mealplan.${clientId}.${d}`);
+        } catch {
+          /* ignore */
+        }
+      }
+      setCopied(true);
+    } finally {
+      setCopying(false);
+    }
+  }
+
   return (
     <div className="jf-tile p-3 flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="jf-eyebrow" style={{ color: 'var(--accent)' }}>
-          План питания на день
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="jf-eyebrow" style={{ color: 'var(--accent)' }}>
+            План питания {mode === 'week' ? 'на неделю' : 'на день'}
+          </div>
+          <div className="jf-seg" style={{ width: 150 }}>
+            {(['day', 'week'] as const).map((m) => (
+              <button
+                key={m}
+                data-active={mode === m}
+                onClick={() => {
+                  setMode(m);
+                  if (m === 'day' && offset > 1) setOffset(0);
+                }}
+              >
+                {m === 'day' ? 'День' : 'Неделя'}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="jf-seg" style={{ width: 150 }}>
-          {([0, 1] as const).map((v) => (
-            <button key={v} data-active={when === v} onClick={() => setWhen(v)}>
-              {v === 0 ? 'Сегодня' : 'Завтра'}
-            </button>
-          ))}
-        </div>
+
+        {mode === 'day' ? (
+          <div className="jf-seg">
+            {[0, 1].map((o) => (
+              <button key={o} data-active={offset === o} onClick={() => setOffset(o)}>
+                {o === 0 ? 'Сегодня' : 'Завтра'}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 7 }, (_, o) => {
+              const l = dayLabel(o);
+              return (
+                <button
+                  key={o}
+                  onClick={() => setOffset(o)}
+                  className="rounded-lg py-1.5 flex flex-col items-center gap-0.5 jf-press"
+                  style={
+                    offset === o
+                      ? { background: 'var(--accent)', color: 'var(--on-accent)' }
+                      : { background: 'var(--surface)', border: '1px solid var(--line)' }
+                  }
+                >
+                  <span className="text-[9px] uppercase">{l.wd}</span>
+                  <span className="text-xs font-bold tabular">{l.num}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {doneInfo && doneInfo.total > 0 && (
@@ -246,8 +327,18 @@ export function CoachMealPlanEditor({ clientId }: { clientId: string }) {
           />
 
           <Button variant="primary" onClick={save} disabled={saving} className="p-3">
-            {saving ? 'Сохраняем…' : saved ? 'Сохранено ✓' : 'Сохранить план'}
+            {saving ? 'Сохраняем…' : saved ? 'Сохранено ✓' : `Сохранить на ${dayLabel(offset).num}-е`}
           </Button>
+
+          {mode === 'week' && (
+            <button
+              className="text-brand-accent text-sm font-medium jf-press disabled:opacity-60"
+              onClick={copyWeek}
+              disabled={copying}
+            >
+              {copying ? 'Копирую…' : copied ? 'Скопировано на неделю ✓' : '⧉ Скопировать этот план на всю неделю'}
+            </button>
+          )}
         </>
       )}
     </div>
