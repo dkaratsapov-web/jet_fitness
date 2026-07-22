@@ -19,6 +19,7 @@ import { ActivityScreen } from './ActivityScreen';
 import { NotificationsScreen } from './NotificationsScreen';
 import { WearableScreen } from './WearableScreen';
 import { OnboardingForm } from './OnboardingForm';
+import { ProfileEditScreen } from './ProfileEditScreen';
 import { LineChart } from '../components/LineChart';
 import { LogoMark } from '../components/Logo';
 import { Ring } from '../components/Ring';
@@ -61,6 +62,7 @@ type Overlay =
   | 'notifications'
   | 'progress'
   | 'wearable'
+  | 'profile-edit'
   | null;
 
 // Client cabinet: bottom-tab shell (Дом · Питание · Прогресс · Профиль) with a
@@ -144,6 +146,7 @@ export function ClientHome({
   if (overlay === 'supplements') return <SupplementsScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'progress') return <ProgressScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'wearable') return <WearableScreen onBack={() => setOverlay(null)} />;
+  if (overlay === 'profile-edit') return <ProfileEditScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'library') return <ExerciseLibrary mode="client" onBack={() => setOverlay(null)} />;
   if (overlay === 'activity') return <ActivityScreen onBack={() => setOverlay(null)} />;
   if (overlay === 'notifications')
@@ -206,6 +209,7 @@ export function ClientHome({
         <ProfileTab
           name={name}
           challenges={challenges}
+          onEditProfile={() => setOverlay('profile-edit')}
           onLibrary={() => setOverlay('library')}
           onActivity={() => setOverlay('activity')}
           onCheckin={() => setOverlay('checkin')}
@@ -729,6 +733,7 @@ function HealthRow({
 function ProfileTab({
   name,
   challenges,
+  onEditProfile,
   onLibrary,
   onActivity,
   onCheckin,
@@ -737,6 +742,7 @@ function ProfileTab({
 }: {
   name: string;
   challenges: ClientChallenge[];
+  onEditProfile: () => void;
   onLibrary: () => void;
   onActivity: () => void;
   onCheckin: () => void;
@@ -752,6 +758,17 @@ function ProfileTab({
         </div>
         <LogoMark size={28} className="text-brand-accent" />
       </header>
+
+      <button className="jf-card p-4 flex items-center gap-3 text-left jf-press" onClick={onEditProfile}>
+        <OliviaAvatar size={40} ring={false} />
+        <span className="flex-1 min-w-0">
+          <span className="block font-semibold">Личные данные</span>
+          <span className="block text-brand-muted text-xs mt-0.5">
+            рост · вес · цель · опыт · ограничения · аллергии
+          </span>
+        </span>
+        <span className="text-brand-accent text-lg">›</span>
+      </button>
 
       <div className="grid grid-cols-2 gap-3">
         <Chip icon="dumbbell" name="Тренировки" sub="свои · активность" onClick={onActivity} />

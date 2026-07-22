@@ -43,6 +43,7 @@ const STATUS_LABEL: Record<CoachClient['status'], string> = {
 };
 
 const SEX_LABEL: Record<Sex, string> = { male: 'М', female: 'Ж', other: '—' };
+const EXP_LABEL: Record<string, string> = { novice: 'Новичок', intermediate: 'Средний', advanced: 'Опытный' };
 
 function ageFrom(birthDate: string | null): number | null {
   if (!birthDate) return null;
@@ -431,6 +432,8 @@ function ClientRow({
             if (p?.sex) chips.push(`Пол: ${SEX_LABEL[p.sex]}`);
             if (p?.heightCm) chips.push(`Рост: ${p.heightCm} см`);
             if (age != null) chips.push(`${age} лет`);
+            if (p?.targetWeightKg) chips.push(`Цель: ${p.targetWeightKg} кг`);
+            if (p?.experience) chips.push(`Опыт: ${EXP_LABEL[p.experience] ?? p.experience}`);
             if (days != null) chips.push(`С нами: ${days} дн.`);
             return (
               <>
@@ -442,6 +445,18 @@ function ClientRow({
                     {chips.map((c) => (
                       <Chip key={c}>{c}</Chip>
                     ))}
+                  </div>
+                )}
+                {p?.limitations && (
+                  <div className="rounded-xl bg-brand-surface2 brand-line p-2 text-xs">
+                    <span className="text-brand-neg font-semibold">⚠ Ограничения: </span>
+                    <span className="text-brand-text">{p.limitations}</span>
+                  </div>
+                )}
+                {p?.allergies && (
+                  <div className="rounded-xl bg-brand-surface2 brand-line p-2 text-xs">
+                    <span className="text-brand-accentStrong font-semibold">Аллергии: </span>
+                    <span className="text-brand-text">{p.allergies}</span>
                   </div>
                 )}
               </>

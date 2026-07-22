@@ -436,15 +436,20 @@ export interface BodySummary {
 
 export type GoalType = 'lose' | 'maintain' | 'gain';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'high' | 'athlete';
+export type ExperienceLevel = 'novice' | 'intermediate' | 'advanced';
 
 export interface ClientProfile {
   goal: string | null;
   sex: Sex | null;
   heightCm: number | null;
   weightKg: number | null;
+  targetWeightKg: number | null;
   birthDate: string | null;
   goalType: GoalType | null;
   activityLevel: ActivityLevel | null;
+  experience: ExperienceLevel | null;
+  limitations: string | null;
+  allergies: string | null;
   solo: boolean;
   targetSource: 'coach' | 'auto' | null;
   filled: boolean;
@@ -837,9 +842,13 @@ export const api = {
     sex?: Sex;
     heightCm?: number;
     weightKg?: number;
+    targetWeightKg?: number;
     birthDate?: string;
     goalType?: GoalType;
     activityLevel?: ActivityLevel;
+    experience?: ExperienceLevel;
+    limitations?: string;
+    allergies?: string;
   }) =>
     request<{ ok: boolean }>('/api/client/profile', {
       method: 'PATCH',

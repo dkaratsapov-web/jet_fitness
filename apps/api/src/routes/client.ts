@@ -24,6 +24,7 @@ const ACTIVITY_FACTORS: Record<string, number> = {
 };
 const ACTIVITY_LEVELS = new Set(Object.keys(ACTIVITY_FACTORS));
 const GOAL_TYPES = new Set(['lose', 'maintain', 'gain']);
+const EXPERIENCE = new Set(['novice', 'intermediate', 'advanced']);
 
 function ageFromBirth(birthDate: Date | null): number {
   if (!birthDate) return 30;
@@ -119,9 +120,13 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
       sex: p?.sex ?? null,
       heightCm: p?.heightCm ?? null,
       weightKg: p?.weightKg ?? null,
+      targetWeightKg: p?.targetWeightKg ?? null,
       birthDate: p?.birthDate ?? null,
       goalType: p?.goalType ?? null,
       activityLevel: p?.activityLevel ?? null,
+      experience: p?.experience ?? null,
+      limitations: p?.limitations ?? null,
+      allergies: p?.allergies ?? null,
       solo,
       targetSource: target?.source ?? null,
       // "Filled" once the essentials (goal + sex + height) are set.
@@ -135,9 +140,13 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
       sex?: string;
       heightCm?: number;
       weightKg?: number;
+      targetWeightKg?: number;
       birthDate?: string;
       goalType?: string;
       activityLevel?: string;
+      experience?: string;
+      limitations?: string;
+      allergies?: string;
     };
   }>('/client/profile', { preHandler: fastify.requireAuth }, async (request, reply) => {
     const auth = request.auth!;
@@ -150,7 +159,12 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
     const goalType = b.goalType && GOAL_TYPES.has(b.goalType) ? b.goalType : undefined;
     const activityLevel =
       b.activityLevel && ACTIVITY_LEVELS.has(b.activityLevel) ? b.activityLevel : undefined;
+    const experience = b.experience && EXPERIENCE.has(b.experience) ? b.experience : undefined;
     const weightKg = typeof b.weightKg === 'number' && b.weightKg > 0 && b.weightKg < 500 ? b.weightKg : undefined;
+    const targetWeightKg =
+      typeof b.targetWeightKg === 'number' && b.targetWeightKg > 0 && b.targetWeightKg < 500
+        ? b.targetWeightKg
+        : undefined;
 
     await prisma.clientProfile.upsert({
       where: { userId: auth.userId },
@@ -159,9 +173,13 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
         sex,
         heightCm: b.heightCm ?? undefined,
         weightKg,
+        targetWeightKg,
         birthDate: b.birthDate ? new Date(b.birthDate) : undefined,
         goalType,
         activityLevel,
+        experience,
+        limitations: b.limitations != null ? b.limitations.trim() || null : undefined,
+        allergies: b.allergies != null ? b.allergies.trim() || null : undefined,
       },
       create: {
         userId: auth.userId,
@@ -169,9 +187,13 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
         sex,
         heightCm: b.heightCm ?? null,
         weightKg: weightKg ?? null,
+        targetWeightKg: targetWeightKg ?? null,
         birthDate: b.birthDate ? new Date(b.birthDate) : null,
         goalType: goalType ?? null,
         activityLevel: activityLevel ?? null,
+        experience: experience ?? null,
+        limitations: b.limitations?.trim() || null,
+        allergies: b.allergies?.trim() || null,
       },
     });
 

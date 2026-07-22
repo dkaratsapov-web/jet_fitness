@@ -146,9 +146,13 @@ model ClientProfile {
   birthDate DateTime?
   heightCm  Float?
   weightKg  Float?        // current weight, used for the auto calorie target (solo mode)
+  targetWeightKg Float?   // goal weight
   goal      String?
   goalType  String?       // lose | maintain | gain (drives the auto target)
   activityLevel String?   // sedentary | light | moderate | high | athlete
+  experience String?      // novice | intermediate | advanced
+  limitations String?     // injuries / health limitations (matters to the coach)
+  allergies  String?      // food allergies / intolerances (matters for nutrition)
   status    ClientStatus  @default(active)
   // Explicit consent for health-data processing (spec §10). Gates the health module per-user.
   healthConsentAt DateTime?
