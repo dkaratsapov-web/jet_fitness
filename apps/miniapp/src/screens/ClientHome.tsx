@@ -27,8 +27,16 @@ import { ChatScreen } from '../components/ChatScreen';
 import { BottomNav, type ClientTab } from '../components/BottomNav';
 import { RoleSwitch } from '../components/RoleSwitch';
 import { LiveDot, Sparkline } from '../components/ui';
-import { OliviaTip, OliviaAvatar } from '../components/Olivia';
+import { OliviaTip, OliviaAvatar, OliviaFab } from '../components/Olivia';
 import { OliviaHelp } from '../components/OliviaHelp';
+
+// Which Olivia help branch matches each client tab (for the floating assistant).
+const TAB_BRANCH: Record<ClientTab, string> = {
+  workouts: 'workouts',
+  nutrition: 'nutrition',
+  health: 'health',
+  profile: 'about',
+};
 import type { NutritionDay, ProgressEntry, ChatContext } from '../api';
 
 // Time-of-day greeting (client is in the user's local tz).
@@ -76,6 +84,7 @@ export function ClientHome({
   const [unread, setUnread] = useState(0);
   const [notiUnread, setNotiUnread] = useState(0);
   const [chatContext, setChatContext] = useState<(ChatContext & { hint?: string }) | null>(null);
+  const [oliviaOpen, setOliviaOpen] = useState(false);
 
   function loadHistory() {
     api.clientWorkouts().then(setHistory).catch(() => setHistory([]));
@@ -200,6 +209,19 @@ export function ClientHome({
           onCheckin={() => setOverlay('checkin')}
           onTechnique={() => setOverlay('technique')}
           onSwitchRole={onSwitchRole}
+        />
+      )}
+
+      <OliviaFab onClick={() => setOliviaOpen(true)} />
+      {oliviaOpen && (
+        <OliviaHelp
+          role="client"
+          initialBranch={TAB_BRANCH[tab]}
+          onClose={() => setOliviaOpen(false)}
+          onAskCoach={() => {
+            setOliviaOpen(false);
+            openChat(null);
+          }}
         />
       )}
 

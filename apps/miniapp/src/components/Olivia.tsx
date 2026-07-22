@@ -116,6 +116,31 @@ export function OliviaTip({
 }
 
 /**
+ * Floating Olivia assistant button — always reachable above the tab bar on
+ * every client screen. This is the app's "assistant is always here" anchor.
+ */
+export function OliviaFab({ onClick, label = 'Оливия' }: { onClick: () => void; label?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label="Оливия — помощник"
+      className="fixed right-4 bottom-24 z-40 flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full jf-press"
+      style={{
+        background: 'linear-gradient(180deg, var(--surface-2), var(--surface))',
+        border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)',
+        boxShadow: '0 10px 26px -10px rgba(0,0,0,0.8), 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent)',
+      }}
+    >
+      <span className="relative">
+        <OliviaAvatar size={40} />
+        <span className="absolute -top-0.5 -right-0.5 jf-live" />
+      </span>
+      <span className="text-sm font-bold pr-0.5">{label}</span>
+    </button>
+  );
+}
+
+/**
  * A one-line inline nudge from Olivia (no dismiss) — for empty states etc.
  */
 export function OliviaSays({ children }: { children: ReactNode }) {

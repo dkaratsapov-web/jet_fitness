@@ -9,6 +9,8 @@ import {
 } from '../api';
 import { LineChart } from '../components/LineChart';
 import { Ring } from '../components/Ring';
+import { OliviaTip, OliviaAvatar } from '../components/Olivia';
+import { OliviaHelp } from '../components/OliviaHelp';
 import { scanBarcode, haptic } from '../telegram';
 
 const MEAL_LABELS: Record<MealType, string> = {
@@ -57,6 +59,7 @@ export function NutritionScreen({
   const [stats, setStats] = useState<NutritionStats | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<NutritionMeal | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   function loadDay(d = date) {
     api.nutritionDay(d).then(setDay).catch(() => setDay(null));
@@ -90,7 +93,13 @@ export function NutritionScreen({
             ← Назад
           </button>
         ) : (
-          <span className="w-12" />
+          <button
+            className="w-9 h-9 rounded-xl grid place-items-center bg-brand-surface brand-line overflow-hidden"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Спросить Оливию"
+          >
+            <OliviaAvatar size={30} ring={false} />
+          </button>
         )}
         <h1 className="text-lg font-semibold">Питание</h1>
         {onComment ? (
@@ -104,6 +113,11 @@ export function NutritionScreen({
           <span className="w-12" />
         )}
       </header>
+
+      <OliviaTip id="nutrition-intro" cta="Добавить приём" onCta={() => setAdding(true)}>
+        Это твой дневник питания. Добавляй приёмы — я посчитаю калории и БЖУ.
+        Не знаешь состав? Отсканируй штрихкод. Кольцо покажет, сколько осталось до цели.
+      </OliviaTip>
 
       {/* День / Статистика */}
       <div className="flex gap-1 rounded-2xl bg-brand-surface brand-line p-1">
@@ -237,6 +251,22 @@ export function NutritionScreen({
             setEditing(null);
             reload();
           }}
+        />
+      )}
+
+      {helpOpen && (
+        <OliviaHelp
+          role="client"
+          initialBranch="nutrition"
+          onClose={() => setHelpOpen(false)}
+          onAskCoach={
+            onComment
+              ? () => {
+                  setHelpOpen(false);
+                  onComment(`Питание · ${humanDate(date)}`);
+                }
+              : undefined
+          }
         />
       )}
     </div>
