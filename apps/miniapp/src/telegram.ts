@@ -17,6 +17,7 @@ interface TelegramThemeParams {
 
 interface TelegramWebApp {
   initData: string;
+  initDataUnsafe?: { user?: { first_name?: string; username?: string } };
   colorScheme: 'light' | 'dark';
   themeParams: TelegramThemeParams;
   ready: () => void;
@@ -48,6 +49,12 @@ export function getWebApp(): TelegramWebApp | null {
 /** The signed initData string, or '' when opened outside Telegram. */
 export function getInitData(): string {
   return getWebApp()?.initData ?? '';
+}
+
+/** The user's Telegram first name — available instantly (before our session
+ * loads), so the preloader can greet by name. Empty outside Telegram. */
+export function getFirstName(): string {
+  return getWebApp()?.initDataUnsafe?.user?.first_name?.trim() ?? '';
 }
 
 /** Light haptic feedback; no-op outside Telegram. */

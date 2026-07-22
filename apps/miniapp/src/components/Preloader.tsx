@@ -4,11 +4,13 @@
 // and if that is missing too, to the graphite gradient. Nothing ever breaks.
 
 import { Logo } from './Logo';
+import { getFirstName } from '../telegram';
 
 const VIDEO = `${import.meta.env.BASE_URL}brand/preloader.mp4`;
 const POSTER = `${import.meta.env.BASE_URL}brand/hero.png`;
 
 export function Preloader() {
+  const name = getFirstName();
   return (
     <div className="fixed inset-0 overflow-hidden bg-brand-bg">
       <video
@@ -41,10 +43,21 @@ export function Preloader() {
         <Logo height={34} />
       </div>
 
-      {/* Gold ring + caption bottom */}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-12 gap-3">
-        <span className="jf-spin block w-9 h-9 rounded-full" aria-label="Загрузка" />
-        <span className="text-brand-muted text-xs tracking-wide">Оливия готовит твой кабинет…</span>
+      {/* Greeting + gold ring bottom */}
+      <div className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-12 gap-3 px-6 text-center">
+        <h2 className="text-2xl font-extrabold tracking-tight jf-rise jf-rise-1">
+          {name ? (
+            <>
+              Привет, <span className="jf-shimmer">{name}</span>!
+            </>
+          ) : (
+            <span className="jf-shimmer">Привет!</span>
+          )}
+        </h2>
+        <span className="text-brand-muted text-sm -mt-1 jf-rise jf-rise-2">
+          Оливия готовит твой кабинет…
+        </span>
+        <span className="jf-spin block w-8 h-8 rounded-full mt-1" aria-label="Загрузка" />
       </div>
     </div>
   );
