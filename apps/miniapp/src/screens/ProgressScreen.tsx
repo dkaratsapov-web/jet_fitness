@@ -111,7 +111,6 @@ export function ProgressScreen({ onBack }: { onBack?: () => void }) {
 // ── New entry: measurement + photos, saved together ──────────────
 function NewEntry({ onSaved }: { onSaved: () => void }) {
   const [weight, setWeight] = useState('');
-  const [bodyFat, setBodyFat] = useState('');
   const [measures, setMeasures] = useState<Record<string, string>>({});
   const [pics, setPics] = useState<Partial<Record<PhotoType, { file: File; url: string }>>>({});
   const [saving, setSaving] = useState(false);
@@ -133,10 +132,10 @@ function NewEntry({ onSaved }: { onSaved: () => void }) {
     }
     const body: ProgressInput = {
       weightKg: weight ? Number(weight) : null,
-      bodyFatPct: bodyFat ? Number(bodyFat) : null,
+      bodyFatPct: null,
       measurements: Object.keys(measurements).length ? measurements : null,
     };
-    const hasMeasure = body.weightKg || body.bodyFatPct || body.measurements;
+    const hasMeasure = body.weightKg || body.measurements;
     const hasPhotos = PHOTO_TYPES.some((t) => pics[t]);
     if (!hasMeasure && !hasPhotos) {
       setError('Заполните замер или добавьте фото');
@@ -152,7 +151,6 @@ function NewEntry({ onSaved }: { onSaved: () => void }) {
       // reset
       PHOTO_TYPES.forEach((t) => pics[t] && URL.revokeObjectURL(pics[t]!.url));
       setWeight('');
-      setBodyFat('');
       setMeasures({});
       setPics({});
       onSaved();
@@ -168,10 +166,7 @@ function NewEntry({ onSaved }: { onSaved: () => void }) {
       <div className="text-brand-accent text-[11px] font-semibold uppercase tracking-[0.16em]">
         Новый замер
       </div>
-      <div className="grid grid-cols-2 gap-2.5">
-        <NumField label="Вес, кг" value={weight} onChange={setWeight} />
-        <NumField label="Жир, %" value={bodyFat} onChange={setBodyFat} />
-      </div>
+      <NumField label="Вес, кг" value={weight} onChange={setWeight} />
       <div className="grid grid-cols-3 gap-2.5">
         {MEASURES.map((m) => (
           <NumField
