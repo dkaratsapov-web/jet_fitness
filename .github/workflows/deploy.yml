@@ -241,7 +241,11 @@ jobs:
           curl -fsSL --max-time 40 "$B/hf_20260722_212139_c1b14c41-56bd-46d9-8b62-a1ea97ce3b4f.png" -o apps/miniapp/public/brand/preloader-3.png || echo "p3 poster skip"
           curl -fsSL --max-time 40 "$B/hf_20260722_212143_749190b1-dc7c-4eb3-969b-6274729382c1.png" -o apps/miniapp/public/brand/preloader-4.png || echo "p4 poster skip"
           curl -fsSL --max-time 40 "$B/hf_20260722_212148_270221bc-2dfe-472e-b792-34780944d7cf.png" -o apps/miniapp/public/brand/preloader-5.png || echo "p5 poster skip"
-          curl -fsSL --max-time 90 "$B/hf_20260722_205439_e0c54f50-75aa-4719-9942-2a0c86792d6f.mp4" -o apps/miniapp/public/brand/preloader-1.mp4 || echo "p1 clip skip"
+          curl -fsSL --max-time 90 "$B/hf_20260722_212506_2340fddf-5e6d-4626-89bc-c8328d3a6704.mp4" -o apps/miniapp/public/brand/preloader-1.mp4 || echo "p1 clip skip"
+          curl -fsSL --max-time 90 "$B/hf_20260722_212510_580cc981-9170-4568-bb5f-5fcc163d564d.mp4" -o apps/miniapp/public/brand/preloader-2.mp4 || echo "p2 clip skip"
+          curl -fsSL --max-time 90 "$B/hf_20260722_212514_db261592-f9a2-49e0-8467-54426ef6607b.mp4" -o apps/miniapp/public/brand/preloader-3.mp4 || echo "p3 clip skip"
+          curl -fsSL --max-time 90 "$B/hf_20260722_212519_21306cae-dd1c-436b-b762-b408683c2d83.mp4" -o apps/miniapp/public/brand/preloader-4.mp4 || echo "p4 clip skip"
+          curl -fsSL --max-time 90 "$B/hf_20260722_212523_1ccd1d0a-0cb1-4a91-ad0a-82e8963dab0a.mp4" -o apps/miniapp/public/brand/preloader-5.mp4 || echo "p5 clip skip"
           # Approved exercise demo video(s), hosted on our own storage.
           mkdir -p apps/miniapp/public/exercises
           curl -fsSL --max-time 60 \
