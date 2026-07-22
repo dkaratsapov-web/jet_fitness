@@ -302,7 +302,8 @@ export const healthModuleRoutes: FastifyPluginAsync = async (fastify) => {
     if (!(await requireConsent(request, reply))) return;
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
-    const since = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000);
+    // Wide window so the intake calendar can scroll back through history.
+    const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
     const rows = await prisma.supplementLog.findMany({
       where: { clientId: request.auth!.userId },
       orderBy: { createdAt: 'desc' },
@@ -315,8 +316,9 @@ export const healthModuleRoutes: FastifyPluginAsync = async (fastify) => {
       amount: s.amount,
       schedule: s.schedule,
       remindersOn: s.remindersOn,
+      createdAt: s.createdAt.toISOString(),
       takenToday: s.intakes.filter((i) => i.takenAt >= dayStart).length,
-      // Distinct days (last 14) with at least one intake — for the mini calendar.
+      // Distinct days (up to 1 year) with at least one intake — for the calendar.
       intakeDays: [...new Set(s.intakes.map((i) => i.takenAt.toISOString().slice(0, 10)))],
     }));
   });

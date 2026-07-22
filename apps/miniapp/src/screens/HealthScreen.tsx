@@ -584,36 +584,69 @@ function scheduleTimes(schedule: unknown): string[] {
   return [];
 }
 
-// Last-14-days intake calendar: a filled cell = taken that day, today outlined.
-function IntakeCalendar({ days }: { days: string[] }) {
+const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+
+// Scrollable intake calendar from the supplement's start date to today (up to a
+// year), auto-scrolled to today. A filled cell = taken that day.
+function IntakeCalendar({ days, since }: { days: string[]; since: string }) {
   const set = new Set(days);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   const today = new Date();
-  const cells = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() - (13 - i));
+  today.setHours(0, 0, 0, 0);
+  const dayMs = 86400000;
+  const earliest = new Date(today.getTime() - 364 * dayMs); // max 1 year back
+  const latestStart = new Date(today.getTime() - 13 * dayMs); // always ≥14 days
+  let from = new Date(since);
+  from.setHours(0, 0, 0, 0);
+  if (from > latestStart) from = latestStart;
+  if (from < earliest) from = earliest;
+
+  const nDays = Math.round((today.getTime() - from.getTime()) / dayMs) + 1;
+  const cells = Array.from({ length: nDays }, (_, i) => {
+    const d = new Date(from.getTime() + i * dayMs);
     const key = d.toISOString().slice(0, 10);
-    return { key, day: d.getDate(), taken: set.has(key), isToday: i === 13 };
+    return {
+      key,
+      day: d.getDate(),
+      month: d.getMonth(),
+      taken: set.has(key),
+      isToday: i === nDays - 1,
+      monthStart: d.getDate() === 1 || i === 0,
+    };
   });
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [nDays]);
+
   return (
-    <div className="flex items-center gap-[3px]">
-      {cells.map((c) => (
-        <div
-          key={c.key}
-          title={c.key}
-          className="flex-1 h-5 rounded-[4px] grid place-items-center text-[8px] font-bold tabular"
-          style={
-            c.taken
-              ? { background: 'var(--accent)', color: 'var(--on-accent)' }
-              : {
-                  background: 'var(--surface-2)',
-                  color: 'var(--muted)',
-                  border: c.isToday ? '1px solid var(--energy)' : '1px solid transparent',
-                }
-          }
-        >
-          {c.day}
-        </div>
-      ))}
+    <div ref={scrollRef} className="overflow-x-auto -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex items-end gap-[3px] w-max">
+        {cells.map((c) => (
+          <div key={c.key} className="flex flex-col items-center gap-0.5">
+            <span className="text-[7px] text-brand-muted h-2 leading-none">
+              {c.monthStart ? MONTHS_SHORT[c.month] : ''}
+            </span>
+            <div
+              title={c.key}
+              className="w-5 h-5 rounded-[4px] grid place-items-center text-[8px] font-bold tabular"
+              style={
+                c.taken
+                  ? { background: 'var(--accent)', color: 'var(--on-accent)' }
+                  : {
+                      background: 'var(--surface-2)',
+                      color: 'var(--muted)',
+                      border: c.isToday ? '1px solid var(--energy)' : '1px solid transparent',
+                    }
+              }
+            >
+              {c.day}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -688,8 +721,8 @@ function SupplementsContent({ onRevoked }: { onRevoked: () => void }) {
                   </button>
                 </div>
 
-                {/* 14-day intake calendar */}
-                <IntakeCalendar days={s.intakeDays} />
+                {/* Scrollable intake calendar */}
+                <IntakeCalendar days={s.intakeDays} since={s.createdAt} />
 
                 {/* today's progress + controls */}
                 <div className="flex items-center gap-2">

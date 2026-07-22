@@ -336,8 +336,9 @@ export interface Supplement {
   amount: string | null;
   schedule: unknown;
   remindersOn: boolean;
+  createdAt: string;
   takenToday: number;
-  intakeDays: string[]; // YYYY-MM-DD days (last 14) with ≥1 intake
+  intakeDays: string[]; // YYYY-MM-DD days (up to 1y) with ≥1 intake
 }
 
 export type ActivityType =
