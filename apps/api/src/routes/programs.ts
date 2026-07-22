@@ -40,12 +40,16 @@ async function applyVideoOverrides(): Promise<void> {
 
 async function ensureStarterLibrary(): Promise<void> {
   await applyVideoOverrides();
+  // Re-seed when the library has grown (new entries added) or isn't enriched yet.
   const first = EXERCISE_LIBRARY[0];
-  const marker = await prisma.exercise.findFirst({
-    where: { ownerCoachId: null, name: first.name },
-    select: { technique: true },
-  });
-  if (marker?.technique) return; // already synced
+  const [count, marker] = await Promise.all([
+    prisma.exercise.count({ where: { ownerCoachId: null } }),
+    prisma.exercise.findFirst({
+      where: { ownerCoachId: null, name: first.name },
+      select: { technique: true },
+    }),
+  ]);
+  if (count >= EXERCISE_LIBRARY.length && marker?.technique) return; // already synced
 
   for (const e of EXERCISE_LIBRARY) {
     const existing = await prisma.exercise.findFirst({
