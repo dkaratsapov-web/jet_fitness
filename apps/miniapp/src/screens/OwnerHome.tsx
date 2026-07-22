@@ -135,10 +135,14 @@ function Overview() {
 
       {revenue && (
         <section>
-          <h2 className="text-lg font-semibold mb-2">Платежи и комиссия</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <h2 className="text-lg font-semibold mb-2">
+            {revenue.feePercent > 0 ? 'Платежи и комиссия' : 'Оборот платформы'}
+          </h2>
+          <div className={`grid ${revenue.feePercent > 0 ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
             <Money value={revenue.gross} label="оборот платформы" />
-            <Money value={revenue.commission} label={`комиссия ${revenue.feePercent}%`} />
+            {revenue.feePercent > 0 && (
+              <Money value={revenue.commission} label={`комиссия ${revenue.feePercent}%`} />
+            )}
           </div>
           {revenue.perCoach.length > 0 && (
             <ul className="flex flex-col gap-2 mt-3">
@@ -150,7 +154,9 @@ function Overview() {
                   <span className="font-medium">{c.coachName}</span>
                   <span className="text-sm">
                     {c.gross.toLocaleString('ru-RU')} ₽
-                    <span className="text-tg-hint"> · комиссия {c.commission.toLocaleString('ru-RU')} ₽</span>
+                    {revenue.feePercent > 0 && (
+                      <span className="text-tg-hint"> · комиссия {c.commission.toLocaleString('ru-RU')} ₽</span>
+                    )}
                   </span>
                 </li>
               ))}

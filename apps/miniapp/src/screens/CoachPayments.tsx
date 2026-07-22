@@ -39,9 +39,12 @@ export function CoachPayments() {
         <div className="grid grid-cols-2 gap-3">
           <Money value={revenue.gross} label="всего собрано" />
           <Money value={revenue.thisMonth} label="в этом месяце" />
-          <Money value={revenue.net} label="ваш доход" />
-          <Money value={revenue.commission} label={`комиссия ${revenue.feePercent}%`} />
         </div>
+      )}
+      {revenue && (
+        <p className="text-brand-muted text-xs -mt-1">
+          Оплаты клиентов приходят тебе полностью — без комиссий платформы.
+        </p>
       )}
 
       <button

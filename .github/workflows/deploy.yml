@@ -220,12 +220,19 @@ jobs:
           curl -fsSL --max-time 30 \
             "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260713_220341_65918d8c-f4e0-4486-b1a8-df21cc2b34a2.png" \
             -o apps/miniapp/public/brand/app-bg.png && echo "background fetched" || echo "background fetch skipped"
-          # Cinematic welcome hero (athlete in white JET FITNESS kit, generated
-          # with Higgsfield). Same rationale: fetched on the runner; the welcome
-          # screen falls back to the graphite gradient if it is missing.
+          # Cinematic welcome hero — "Olivia", the brand mascot/assistant
+          # (stylized athlete in white JET FITNESS kit, generated with Higgsfield).
+          # Fetched on the runner; the welcome screen falls back to the graphite
+          # gradient if it is missing.
           curl -fsSL --max-time 40 \
-            "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260722_203429_f01b989e-f61b-4345-a0aa-93e2334f80dc.png" \
+            "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260722_204435_952ca0b4-5adb-4ede-8066-80702f0678c3.png" \
             -o apps/miniapp/public/brand/hero.png && echo "hero fetched" || echo "hero fetch skipped"
+          # Olivia's round assistant avatar (used in tip bubbles). The preloader
+          # clip is added once approved; until then the Preloader shows the still
+          # hero as its poster.
+          curl -fsSL --max-time 40 \
+            "https://d8j0ntlcm91z4.cloudfront.net/user_3FDW4xDpfIw798Hq1MYcfG8Ze1n/hf_20260722_205106_91253cb0-4424-4c01-a111-800ba675751f.png" \
+            -o apps/miniapp/public/brand/olivia.png && echo "olivia avatar fetched" || echo "olivia avatar skipped"
           # Approved exercise demo video(s), hosted on our own storage.
           mkdir -p apps/miniapp/public/exercises
           curl -fsSL --max-time 60 \

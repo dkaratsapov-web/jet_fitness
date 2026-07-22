@@ -6,6 +6,7 @@ import { ClientHome } from './screens/ClientHome';
 import { OwnerHome } from './screens/OwnerHome';
 import { RolePicker } from './screens/RolePicker';
 import { WelcomeScreen } from './screens/WelcomeScreen';
+import { Preloader } from './components/Preloader';
 
 type State =
   | { phase: 'loading' }
@@ -84,7 +85,7 @@ export function App() {
   }
 
   if (state.phase === 'loading') {
-    return <Centered>Загрузка…</Centered>;
+    return <Preloader />;
   }
 
   if (state.phase === 'no-telegram') {

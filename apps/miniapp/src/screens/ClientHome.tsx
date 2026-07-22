@@ -27,6 +27,7 @@ import { ChatScreen } from '../components/ChatScreen';
 import { BottomNav, type ClientTab } from '../components/BottomNav';
 import { RoleSwitch } from '../components/RoleSwitch';
 import { LiveDot, Sparkline } from '../components/ui';
+import { OliviaTip } from '../components/Olivia';
 import type { NutritionDay, ProgressEntry, ChatContext } from '../api';
 
 // Time-of-day greeting (client is in the user's local tz).
@@ -277,6 +278,11 @@ function HomeTab({
       </header>
 
       {needsOnboarding && <OnboardingForm onDone={onOnboarded} />}
+
+      <OliviaTip id="home-intro" cta="Открыть питание" onCta={() => onTab('nutrition')}>
+        Привет! Я Оливия — твой гид по Jet&nbsp;Fitness. Здесь собрано всё: тренировки,
+        питание и здоровье. Начни с приёма пищи — так тренеру виднее твой прогресс.
+      </OliviaTip>
 
       <div className="jf-rise jf-rise-1">
         <Hero program={program} history={history} onStart={onStart} />

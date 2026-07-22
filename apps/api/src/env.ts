@@ -50,7 +50,9 @@ export const env = {
   // Shared secret guarding the internal reminders endpoint (called by a
   // scheduled GitHub Actions workflow). Reminders are off unless this is set.
   remindersSecret: optional('REMINDERS_SECRET', ''),
-  platformFeePercent: Number(optional('PLATFORM_FEE_PERCENT', '10')),
+  // Fixed-subscription model: coaches keep 100% of client payments, so the
+  // platform commission defaults to 0 (can still be overridden via env).
+  platformFeePercent: Number(optional('PLATFORM_FEE_PERCENT', '0')),
 
   // FatSecret Platform API (nutrition database). When both are set, food search
   // prefers FatSecret and falls back to Open Food Facts. OAuth 2.0 client

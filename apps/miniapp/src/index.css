@@ -416,6 +416,19 @@ button:focus-visible {
   transform: scale(0.98);
 }
 
+/* Gold ring spinner (preloader). */
+.jf-spin {
+  background:
+    conic-gradient(from 0deg, transparent 0%, var(--accent) 82%, var(--accent-strong) 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  animation: jf-rotate 0.9s linear infinite;
+}
+@keyframes jf-rotate {
+  to { transform: rotate(1turn); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .jf-live { animation: none; }
+  .jf-spin { animation-duration: 2.4s; }
 }
