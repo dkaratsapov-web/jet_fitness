@@ -3,14 +3,32 @@
 // (brand/preloader.mp4); if it is missing we fall back to the still hero image,
 // and if that is missing too, to the graphite gradient. Nothing ever breaks.
 
+import { useState } from 'react';
 import { Logo } from './Logo';
 import { getFirstName } from '../telegram';
 
-const VIDEO = `${import.meta.env.BASE_URL}brand/preloader.mp4`;
-const POSTER = `${import.meta.env.BASE_URL}brand/hero.png`;
+// Rotating preloaders: several location clips (gym, women's studio, functional,
+// cardio-sunrise, rooftop) shown in turn on each open. Files are fetched onto
+// the deploy runner as brand/preloader-{n}.mp4 (+ .png poster). Missing files
+// fall back to the poster, then the graphite gradient — nothing breaks.
+const PRELOADER_COUNT = 5;
+
+function pickIndex(): number {
+  try {
+    const n = Number(localStorage.getItem('jf.preloader.i')) || 0;
+    localStorage.setItem('jf.preloader.i', String(n + 1));
+    return (n % PRELOADER_COUNT) + 1;
+  } catch {
+    return 1;
+  }
+}
 
 export function Preloader() {
   const name = getFirstName();
+  const [idx] = useState(pickIndex);
+  const base = import.meta.env.BASE_URL;
+  const VIDEO = `${base}brand/preloader-${idx}.mp4`;
+  const POSTER = `${base}brand/preloader-${idx}.png`;
   return (
     <div className="fixed inset-0 overflow-hidden bg-brand-bg">
       <video
