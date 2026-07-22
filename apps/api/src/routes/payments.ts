@@ -113,6 +113,7 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
       amount: toMajor(s.amount),
       periodDays: s.periodDays,
       workouts: s.workouts,
+      sessionsUsed: s.sessionsUsed,
       status: s.status,
       currentPeriodEnd: s.currentPeriodEnd,
       paidTotal: toMajor(s.payments.reduce((n, p) => n + p.amount, 0)),
@@ -120,8 +121,41 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
     }));
   });
 
+  // ── Mark trainings from the block as attended (± delta) ─────────
+  fastify.post<{ Params: { id: string }; Body: { delta?: number } }>(
+    '/coach/subscriptions/:id/sessions',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const sub = await prisma.subscription.findFirst({
+        where: { id: request.params.id, coachId: auth.userId },
+      });
+      if (!sub) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const delta = Math.trunc(Number(request.body?.delta ?? 1)) || 0;
+      const cap = sub.workouts ?? 9999;
+      const next = Math.max(0, Math.min(cap, sub.sessionsUsed + delta));
+      await prisma.subscription.update({
+        where: { id: sub.id },
+        data: { sessionsUsed: next },
+      });
+      // Nudge the client only when a session is added (not on corrections).
+      if (delta > 0 && sub.workouts) {
+        await notifyUser(
+          sub.clientId,
+          `✅ Тренер отметил тренировку — ${next} из ${sub.workouts} по блоку «${sub.planName}»`,
+          { type: 'payment' },
+        );
+      }
+      return { ok: true, sessionsUsed: next };
+    },
+  );
+
   // ── Record a received payment against a subscription ────────────
-  fastify.post<{ Params: { id: string }; Body: { amount?: number } }>(
+  fastify.post<{ Params: { id: string }; Body: { amount?: number; renew?: boolean } }>(
     '/coach/subscriptions/:id/payments',
     { preHandler: fastify.requireAuth },
     async (request, reply) => {
@@ -135,11 +169,17 @@ export const paymentRoutes: FastifyPluginAsync = async (fastify) => {
         return;
       }
       const amountMinor = request.body?.amount ? toMinor(request.body.amount) : sub.amount;
+      // Installments: a part-payment (renew=false) just records money and keeps
+      // the block active, without pushing the period end forward each time.
+      // A period renewal (renew=true, the default) extends the validity window.
+      const renew = request.body?.renew !== false;
 
       const base = sub.currentPeriodEnd && sub.currentPeriodEnd > new Date()
         ? sub.currentPeriodEnd
         : new Date();
-      const nextEnd = new Date(base.getTime() + sub.periodDays * 24 * 60 * 60 * 1000);
+      const nextEnd = renew
+        ? new Date(base.getTime() + sub.periodDays * 24 * 60 * 60 * 1000)
+        : sub.currentPeriodEnd;
 
       await prisma.$transaction([
         prisma.payment.create({

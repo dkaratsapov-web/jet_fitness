@@ -5,6 +5,7 @@ import {
   type CoachRevenue,
   type CoachClient,
 } from '../api';
+import { Card, ProgressBar, Chip, Avatar } from '../components/ui';
 
 const STATUS_LABEL: Record<Subscription['status'], string> = {
   active: 'активна',
@@ -62,11 +63,11 @@ export function CoachPayments() {
           и свою выручку.
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {subs.map((s) => (
             <SubRow key={s.id} sub={s} onChanged={reload} />
           ))}
-        </ul>
+        </div>
       )}
 
       {creating && (
@@ -85,65 +86,153 @@ export function CoachPayments() {
 
 function SubRow({ sub, onChanged }: { sub: Subscription; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const remaining = Math.max(0, sub.amount - sub.paidTotal);
+  const paidPct = sub.amount > 0 ? (sub.paidTotal / sub.amount) * 100 : 0;
+  const [payAmount, setPayAmount] = useState(String(remaining || sub.amount));
+  const canceled = sub.status === 'canceled';
 
-  async function pay() {
+  async function run(fn: () => Promise<unknown>) {
     setBusy(true);
     try {
-      await api.recordPayment(sub.id);
+      await fn();
       onChanged();
     } finally {
       setBusy(false);
     }
   }
-  async function cancel() {
-    setBusy(true);
-    try {
-      await api.cancelSubscription(sub.id);
-      onChanged();
-    } finally {
-      setBusy(false);
-    }
-  }
+  const session = (delta: number) => run(() => api.markSubscriptionSession(sub.id, delta));
+  const cancel = () => run(() => api.cancelSubscription(sub.id));
+  const renew = () => run(() => api.recordPayment(sub.id, sub.amount, true));
+  const contribute = () => {
+    const amt = Number(payAmount);
+    if (!amt || amt <= 0) return;
+    setPayOpen(false);
+    return run(() => api.recordPayment(sub.id, amt, false));
+  };
+
+  const statusTone = sub.status === 'active' ? 'energy' : undefined;
 
   return (
-    <li className="rounded-2xl bg-tg-secondaryBg p-3 flex flex-col gap-2">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="font-medium">{sub.clientName}</div>
-          <div className="text-tg-hint text-xs">
-            {sub.planName} · {sub.amount} ₽ / {sub.periodDays} дн.
-            {sub.workouts ? ` · ${sub.workouts} трен.` : ''}
-          </div>
-          <div className="text-tg-hint text-xs">
-            {STATUS_LABEL[sub.status]}
-            {sub.currentPeriodEnd &&
-              ` · до ${new Date(sub.currentPeriodEnd).toLocaleDateString('ru-RU', {
-                day: 'numeric',
-                month: 'short',
-              })}`}
-            {sub.paymentsCount > 0 && ` · оплачено ${sub.paidTotal} ₽`}
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <Avatar name={sub.clientName} size={38} />
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold leading-tight truncate">{sub.clientName}</div>
+          <div className="text-brand-muted text-xs truncate">
+            {sub.planName} · {sub.amount.toLocaleString('ru-RU')} ₽ / {sub.periodDays} дн.
           </div>
         </div>
+        <Chip tone={statusTone}>{STATUS_LABEL[sub.status]}</Chip>
       </div>
-      {sub.status !== 'canceled' && (
-        <div className="flex gap-2">
-          <button
-            className="rounded-xl bg-tg-button text-tg-buttonText px-3 py-2 text-sm disabled:opacity-60"
-            onClick={pay}
-            disabled={busy}
-          >
-            Отметить оплату
-          </button>
-          <button
-            className="rounded-xl bg-tg-bg text-tg-hint px-3 py-2 text-sm disabled:opacity-60"
-            onClick={cancel}
-            disabled={busy}
-          >
-            Отменить
-          </button>
+
+      {sub.currentPeriodEnd && (
+        <div className="text-brand-muted text-[11px] -mt-1">
+          действует до{' '}
+          {new Date(sub.currentPeriodEnd).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
         </div>
       )}
-    </li>
+
+      {/* Trainings progress */}
+      {sub.workouts ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-brand-muted">Тренировки</span>
+            <span className="font-semibold tabular">
+              {sub.sessionsUsed} / {sub.workouts}
+            </span>
+          </div>
+          <ProgressBar pct={(sub.sessionsUsed / sub.workouts) * 100} tone="energy" />
+          {!canceled && (
+            <div className="flex items-center gap-2 mt-1">
+              <button
+                className="w-8 h-8 rounded-lg brand-line bg-brand-surface2 text-brand-text disabled:opacity-40 jf-press"
+                onClick={() => session(-1)}
+                disabled={busy || sub.sessionsUsed <= 0}
+                aria-label="Убрать тренировку"
+              >
+                −
+              </button>
+              <button
+                className="flex-1 h-8 rounded-lg bg-brand-energy text-brand-onEnergy text-sm font-semibold disabled:opacity-40 jf-press"
+                onClick={() => session(1)}
+                disabled={busy || sub.sessionsUsed >= sub.workouts}
+              >
+                ＋ Отметить тренировку
+              </button>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {/* Payment progress */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-brand-muted">Оплата</span>
+          <span className="font-semibold tabular">
+            {sub.paidTotal.toLocaleString('ru-RU')} / {sub.amount.toLocaleString('ru-RU')} ₽
+          </span>
+        </div>
+        <ProgressBar pct={paidPct} />
+        {remaining > 0 ? (
+          <div className="text-[11px] text-brand-accentStrong font-semibold">
+            осталось {remaining.toLocaleString('ru-RU')} ₽
+          </div>
+        ) : (
+          <div className="text-[11px] text-brand-pos font-semibold">оплачено полностью ✓</div>
+        )}
+      </div>
+
+      {!canceled && (
+        <>
+          {payOpen && (
+            <div className="flex items-center gap-2">
+              <input
+                className="flex-1 rounded-xl bg-brand-surface2 brand-line p-2.5 text-sm outline-none tabular"
+                inputMode="numeric"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="Сумма взноса, ₽"
+              />
+              <button
+                className="rounded-xl bg-brand-accent text-brand-onAccent px-4 py-2.5 text-sm font-semibold disabled:opacity-60 jf-press"
+                onClick={contribute}
+                disabled={busy}
+              >
+                Внести
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {remaining > 0 && !payOpen && (
+              <button
+                className="rounded-xl bg-brand-accent text-brand-onAccent px-3 py-2 text-sm font-semibold jf-press"
+                onClick={() => {
+                  setPayAmount(String(remaining));
+                  setPayOpen(true);
+                }}
+              >
+                ＋ Внести оплату
+              </button>
+            )}
+            <button
+              className="rounded-xl bg-brand-surface brand-line px-3 py-2 text-sm text-brand-text jf-press disabled:opacity-60"
+              onClick={renew}
+              disabled={busy}
+            >
+              Продлить период
+            </button>
+            <button
+              className="rounded-xl bg-transparent px-3 py-2 text-sm text-brand-muted jf-press disabled:opacity-60"
+              onClick={cancel}
+              disabled={busy}
+            >
+              Отменить
+            </button>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -270,9 +359,11 @@ function NewSubModal({
 
 function Money({ value, label }: { value: number; label: string }) {
   return (
-    <div className="rounded-2xl bg-tg-secondaryBg p-3 text-center">
-      <div className="text-xl font-semibold">{value.toLocaleString('ru-RU')} ₽</div>
-      <div className="text-tg-hint text-xs">{label}</div>
+    <div className="jf-tile p-3.5">
+      <div className="text-xl font-extrabold tabular text-brand-accentStrong">
+        {value.toLocaleString('ru-RU')} ₽
+      </div>
+      <div className="jf-eyebrow mt-1" style={{ color: 'var(--muted)' }}>{label}</div>
     </div>
   );
 }

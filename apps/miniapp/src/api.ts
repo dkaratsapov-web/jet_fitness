@@ -431,6 +431,7 @@ export interface Subscription {
   amount: number;
   periodDays: number;
   workouts: number | null;
+  sessionsUsed: number;
   status: 'active' | 'past_due' | 'canceled';
   currentPeriodEnd: string | null;
   paidTotal: number;
@@ -912,10 +913,21 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  recordPayment: (subscriptionId: string, amount?: number) =>
+  recordPayment: (subscriptionId: string, amount?: number, renew?: boolean) =>
     request<{ ok: boolean; amount: number; commission: number }>(
       `/api/coach/subscriptions/${subscriptionId}/payments`,
-      { method: 'POST', body: JSON.stringify(amount != null ? { amount } : {}) },
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          ...(amount != null ? { amount } : {}),
+          ...(renew != null ? { renew } : {}),
+        }),
+      },
+    ),
+  markSubscriptionSession: (subscriptionId: string, delta: number) =>
+    request<{ ok: boolean; sessionsUsed: number }>(
+      `/api/coach/subscriptions/${subscriptionId}/sessions`,
+      { method: 'POST', body: JSON.stringify({ delta }) },
     ),
   cancelSubscription: (subscriptionId: string) =>
     request<{ ok: boolean }>(`/api/coach/subscriptions/${subscriptionId}/cancel`, {

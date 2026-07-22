@@ -487,6 +487,7 @@ model Subscription {
   currency         String
   periodDays       Int
   workouts         Int?               // trainings included in the plan (null = unlimited/not set)
+  sessionsUsed     Int                @default(0) // trainings from the block already attended
   status           SubscriptionStatus @default(active)
   currentPeriodEnd DateTime?
   createdAt        DateTime           @default(now())
