@@ -15,6 +15,73 @@ const PHOTO_TYPES: ProgressPhotoType[] = ['front', 'side', 'back'];
 const PHOTO_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic']);
 const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm', 'm4v']);
 const SEXES: Sex[] = ['male', 'female', 'other'];
+const ACTIVITY_FACTORS: Record<string, number> = {
+  sedentary: 1.2,
+  light: 1.375,
+  moderate: 1.55,
+  high: 1.725,
+  athlete: 1.9,
+};
+const ACTIVITY_LEVELS = new Set(Object.keys(ACTIVITY_FACTORS));
+const GOAL_TYPES = new Set(['lose', 'maintain', 'gain']);
+
+function ageFromBirth(birthDate: Date | null): number {
+  if (!birthDate) return 30;
+  const now = new Date();
+  let a = now.getFullYear() - birthDate.getFullYear();
+  const m = now.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) a--;
+  return a >= 14 && a < 100 ? a : 30;
+}
+
+// Mifflin-St Jeor BMR × activity, adjusted for the goal → daily kcal + macros.
+function computeTarget(p: {
+  sex: Sex | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  birthDate: Date | null;
+  activityLevel: string | null;
+  goalType: string | null;
+}): { kcal: number; protein: number; fat: number; carbs: number } | null {
+  if (!p.heightCm || !p.weightKg) return null;
+  const age = ageFromBirth(p.birthDate);
+  const s = p.sex === 'male' ? 5 : p.sex === 'female' ? -161 : -78;
+  const bmr = 10 * p.weightKg + 6.25 * p.heightCm - 5 * age + s;
+  const af = ACTIVITY_FACTORS[p.activityLevel ?? 'light'] ?? 1.375;
+  let kcal = bmr * af;
+  if (p.goalType === 'lose') kcal *= 0.82;
+  else if (p.goalType === 'gain') kcal *= 1.12;
+  kcal = Math.max(1200, Math.round(kcal / 10) * 10);
+  const protein = Math.round(p.weightKg * (p.goalType === 'lose' ? 2.0 : 1.8));
+  const fat = Math.round((kcal * 0.27) / 9);
+  const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
+  return { kcal, protein, fat, carbs };
+}
+
+// Solo = no coach relationship at all.
+async function isSolo(clientId: string): Promise<boolean> {
+  const link = await prisma.coachClient.findFirst({ where: { clientId }, select: { id: true } });
+  return !link;
+}
+
+// Recompute & store the auto nutrition target for a solo client (never
+// overwrites a coach-set target).
+async function refreshAutoTarget(userId: string): Promise<void> {
+  if (!(await isSolo(userId))) return;
+  const p = await prisma.clientProfile.findUnique({ where: { userId } });
+  if (!p) return;
+  const latest = await prisma.nutritionTarget.findFirst({
+    where: { clientId: userId },
+    orderBy: { activeFrom: 'desc' },
+  });
+  if (latest && latest.source !== 'auto') return; // coach owns the target
+  const t = computeTarget(p);
+  if (!t) return;
+  if (latest && latest.kcal === t.kcal && latest.protein === t.protein && latest.fat === t.fat && latest.carbs === t.carbs) {
+    return; // unchanged
+  }
+  await prisma.nutritionTarget.create({ data: { clientId: userId, ...t, source: 'auto' } });
+}
 
 interface SetInput {
   programExerciseId: string;
@@ -42,19 +109,36 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
   // Client profile (onboarding questionnaire): goal / sex / height / birth date.
   fastify.get('/client/profile', { preHandler: fastify.requireAuth }, async (request) => {
     const auth = request.auth!;
-    const p = await prisma.clientProfile.findUnique({ where: { userId: auth.userId } });
+    const [p, solo, target] = await Promise.all([
+      prisma.clientProfile.findUnique({ where: { userId: auth.userId } }),
+      isSolo(auth.userId),
+      prisma.nutritionTarget.findFirst({ where: { clientId: auth.userId }, orderBy: { activeFrom: 'desc' } }),
+    ]);
     return {
       goal: p?.goal ?? null,
       sex: p?.sex ?? null,
       heightCm: p?.heightCm ?? null,
+      weightKg: p?.weightKg ?? null,
       birthDate: p?.birthDate ?? null,
+      goalType: p?.goalType ?? null,
+      activityLevel: p?.activityLevel ?? null,
+      solo,
+      targetSource: target?.source ?? null,
       // "Filled" once the essentials (goal + sex + height) are set.
       filled: Boolean(p?.goal && p?.sex && p?.heightCm),
     };
   });
 
   fastify.patch<{
-    Body: { goal?: string; sex?: string; heightCm?: number; birthDate?: string };
+    Body: {
+      goal?: string;
+      sex?: string;
+      heightCm?: number;
+      weightKg?: number;
+      birthDate?: string;
+      goalType?: string;
+      activityLevel?: string;
+    };
   }>('/client/profile', { preHandler: fastify.requireAuth }, async (request, reply) => {
     const auth = request.auth!;
     const b = request.body ?? {};
@@ -63,22 +147,47 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
       reply.code(400).send({ error: 'bad_request', reason: 'invalid_sex' });
       return;
     }
+    const goalType = b.goalType && GOAL_TYPES.has(b.goalType) ? b.goalType : undefined;
+    const activityLevel =
+      b.activityLevel && ACTIVITY_LEVELS.has(b.activityLevel) ? b.activityLevel : undefined;
+    const weightKg = typeof b.weightKg === 'number' && b.weightKg > 0 && b.weightKg < 500 ? b.weightKg : undefined;
+
     await prisma.clientProfile.upsert({
       where: { userId: auth.userId },
       update: {
         goal: b.goal?.trim() || undefined,
         sex,
         heightCm: b.heightCm ?? undefined,
+        weightKg,
         birthDate: b.birthDate ? new Date(b.birthDate) : undefined,
+        goalType,
+        activityLevel,
       },
       create: {
         userId: auth.userId,
         goal: b.goal?.trim() || null,
         sex,
         heightCm: b.heightCm ?? null,
+        weightKg: weightKg ?? null,
         birthDate: b.birthDate ? new Date(b.birthDate) : null,
+        goalType: goalType ?? null,
+        activityLevel: activityLevel ?? null,
       },
     });
+
+    // Record a weight measurement so dynamics populate from day one.
+    if (weightKg != null) {
+      const last = await prisma.progressEntry.findFirst({
+        where: { clientId: auth.userId },
+        orderBy: { date: 'desc' },
+        select: { weightKg: true },
+      });
+      if (!last || last.weightKg !== weightKg) {
+        await prisma.progressEntry.create({ data: { clientId: auth.userId, date: new Date(), weightKg } });
+      }
+    }
+
+    await refreshAutoTarget(auth.userId);
     return { ok: true };
   });
 

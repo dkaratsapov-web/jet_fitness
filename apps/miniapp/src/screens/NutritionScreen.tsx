@@ -172,6 +172,9 @@ export function NutritionScreen({
                   {goal ? (
                     <div className="text-brand-muted text-xs mb-2">
                       осталось {Math.max(0, goal.kcal - t.kcal)} ккал
+                      {goal.source === 'auto' && (
+                        <span className="text-brand-energy"> · авто</span>
+                      )}
                     </div>
                   ) : (
                     <div className="text-brand-muted text-xs mb-2">цель задаёт тренер</div>

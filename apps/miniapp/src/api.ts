@@ -255,6 +255,8 @@ export interface Macros {
   protein: number;
   fat: number;
   carbs: number;
+  /** present on nutrition targets: 'coach' or 'auto' (self-computed, solo mode) */
+  source?: 'coach' | 'auto';
 }
 
 export interface NutritionMeal {
@@ -402,11 +404,19 @@ export interface ClientChallenge {
 
 export type Sex = 'male' | 'female' | 'other';
 
+export type GoalType = 'lose' | 'maintain' | 'gain';
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'high' | 'athlete';
+
 export interface ClientProfile {
   goal: string | null;
   sex: Sex | null;
   heightCm: number | null;
+  weightKg: number | null;
   birthDate: string | null;
+  goalType: GoalType | null;
+  activityLevel: ActivityLevel | null;
+  solo: boolean;
+  targetSource: 'coach' | 'auto' | null;
   filled: boolean;
 }
 
@@ -787,7 +797,15 @@ export const api = {
   clientProgress: () => request<ProgressEntry[]>('/api/client/progress'),
   clientPhotos: () => request<ProgressPhoto[]>('/api/client/progress-photos'),
   clientProfile: () => request<ClientProfile>('/api/client/profile'),
-  updateProfile: (body: { goal?: string; sex?: Sex; heightCm?: number; birthDate?: string }) =>
+  updateProfile: (body: {
+    goal?: string;
+    sex?: Sex;
+    heightCm?: number;
+    weightKg?: number;
+    birthDate?: string;
+    goalType?: GoalType;
+    activityLevel?: ActivityLevel;
+  }) =>
     request<{ ok: boolean }>('/api/client/profile', {
       method: 'PATCH',
       body: JSON.stringify(body),

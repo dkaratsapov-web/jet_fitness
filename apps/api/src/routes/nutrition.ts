@@ -76,7 +76,7 @@ async function currentTarget(clientId: string) {
     where: { clientId },
     orderBy: { activeFrom: 'desc' },
   });
-  return t ? { kcal: t.kcal, protein: t.protein, fat: t.fat, carbs: t.carbs } : null;
+  return t ? { kcal: t.kcal, protein: t.protein, fat: t.fat, carbs: t.carbs, source: t.source } : null;
 }
 
 async function daySummary(clientId: string, dateStr?: string) {
