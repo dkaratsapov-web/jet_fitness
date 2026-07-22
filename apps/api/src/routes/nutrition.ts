@@ -129,6 +129,124 @@ function buildInsights(x: {
   return out;
 }
 
+// Food search shared by client and coach: FatSecret → local cache → OFF.
+async function searchFoodsInternal(
+  q: string,
+): Promise<{ foods: Array<{ id: string; name: string; barcode: string | null; per100: Macros }> }> {
+  if (q.length < 2) return { foods: [] };
+  const MAX_RESULTS = 30;
+  const foods: Array<{ id: string; name: string; barcode: string | null; per100: Macros }> = [];
+  const seenNames = new Set<string>();
+  const pushFood = (f: { id: string; name: string; barcode: string | null; per100: Macros }) => {
+    const key = f.name.trim().toLowerCase();
+    if (foods.length >= MAX_RESULTS || foods.some((x) => x.id === f.id) || seenNames.has(key)) return;
+    seenNames.add(key);
+    foods.push(f);
+  };
+
+  if (isFatSecretConfigured()) {
+    for (const r of await searchFatSecret(q)) {
+      if (foods.length >= MAX_RESULTS) break;
+      const saved = await prisma.foodItem.upsert({
+        where: { source_externalId: { source: 'fatsecret', externalId: r.externalId } },
+        update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },
+        create: { source: 'fatsecret', externalId: r.externalId, name: r.name, per100: r.per100 as object, barcode: r.barcode },
+        select: { id: true, name: true, barcode: true, per100: true },
+      });
+      pushFood({ ...saved, per100: saved.per100 as unknown as Macros });
+    }
+  }
+
+  const local = await prisma.foodItem.findMany({
+    where: { name: { contains: q, mode: 'insensitive' } },
+    take: 25,
+    orderBy: { createdAt: 'desc' },
+  });
+  for (const f of local) pushFood({ ...f, per100: f.per100 as unknown as Macros });
+
+  if (foods.length < MAX_RESULTS) {
+    for (const r of await searchOpenFoodFacts(q)) {
+      if (foods.length >= MAX_RESULTS) break;
+      const saved = await prisma.foodItem.upsert({
+        where: { source_externalId: { source: 'openfoodfacts', externalId: r.externalId } },
+        update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },
+        create: { source: 'openfoodfacts', externalId: r.externalId, name: r.name, per100: r.per100 as object, barcode: r.barcode },
+        select: { id: true, name: true, barcode: true, per100: true },
+      });
+      pushFood({ ...saved, per100: saved.per100 as unknown as Macros });
+    }
+  }
+  return { foods };
+}
+
+interface MealInput {
+  mealType?: string;
+  grams?: number;
+  name?: string;
+  foodItemId?: string;
+  per100?: Partial<Macros>;
+  date?: string;
+}
+type MealResult =
+  | { ok: true; id: string; name: string | null }
+  | { ok: false; status: number; reason: string };
+
+// Log a meal into a client's diary (used by the client for themselves and by a
+// coach on the client's behalf). Resolves macros from a FoodItem or per-100 body.
+async function logMealInternal(clientId: string, b: MealInput): Promise<MealResult> {
+  const mealType = (b.mealType ?? 'snack') as MealType;
+  const grams = Number(b.grams);
+  const mealDate = /^\d{4}-\d{2}-\d{2}$/.test(b.date ?? '')
+    ? new Date(`${b.date}T12:00:00.000Z`)
+    : new Date();
+  if (!MEAL_TYPES.includes(mealType) || !grams || grams <= 0) {
+    return { ok: false, status: 400, reason: 'invalid_meal' };
+  }
+
+  let per100: Macros | null = null;
+  let foodItemId = b.foodItemId ?? null;
+  let name = b.name?.trim() || null;
+
+  if (foodItemId) {
+    const food = await prisma.foodItem.findUnique({ where: { id: foodItemId } });
+    if (!food) return { ok: false, status: 404, reason: 'food_not_found' };
+    per100 = food.per100 as unknown as Macros;
+    name = food.name;
+  } else if (b.per100) {
+    per100 = {
+      kcal: Number(b.per100.kcal) || 0,
+      protein: Number(b.per100.protein) || 0,
+      fat: Number(b.per100.fat) || 0,
+      carbs: Number(b.per100.carbs) || 0,
+    };
+    if (name) {
+      const food = await prisma.foodItem.create({
+        data: { source: 'manual', name, per100: per100 as object },
+        select: { id: true },
+      });
+      foodItemId = food.id;
+    }
+  }
+  if (!per100) return { ok: false, status: 400, reason: 'macros_required' };
+
+  const factor = grams / 100;
+  const meal = await prisma.mealLog.create({
+    data: {
+      clientId,
+      date: mealDate,
+      mealType,
+      foodItemId,
+      grams,
+      kcal: per100.kcal * factor,
+      protein: per100.protein * factor,
+      fat: per100.fat * factor,
+      carbs: per100.carbs * factor,
+    },
+    select: { id: true },
+  });
+  return { ok: true, id: meal.id, name };
+}
+
 export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
   // ── Client: target & day summary ────────────────────────────────
   fastify.get('/client/nutrition/target', { preHandler: fastify.requireAuth }, async (request) => {
@@ -249,70 +367,12 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
       date?: string;
     };
   }>('/client/nutrition/meals', { preHandler: fastify.requireAuth }, async (request, reply) => {
-    const auth = request.auth!;
-    const b = request.body ?? {};
-    const mealType = (b.mealType ?? 'snack') as MealType;
-    const grams = Number(b.grams);
-    // Log to the selected day (noon UTC keeps it inside the day range); today by default.
-    const mealDate = /^\d{4}-\d{2}-\d{2}$/.test(b.date ?? '')
-      ? new Date(`${b.date}T12:00:00.000Z`)
-      : new Date();
-    if (!MEAL_TYPES.includes(mealType) || !grams || grams <= 0) {
-      reply.code(400).send({ error: 'bad_request', reason: 'invalid_meal' });
+    const res = await logMealInternal(request.auth!.userId, request.body ?? {});
+    if (!res.ok) {
+      reply.code(res.status).send({ error: 'bad_request', reason: res.reason });
       return;
     }
-
-    // Resolve per-100g macros: from a saved FoodItem or from the request body.
-    let per100: Macros | null = null;
-    let foodItemId = b.foodItemId ?? null;
-    let name = b.name?.trim() || null;
-
-    if (foodItemId) {
-      const food = await prisma.foodItem.findUnique({ where: { id: foodItemId } });
-      if (!food) {
-        reply.code(404).send({ error: 'not_found', reason: 'food_not_found' });
-        return;
-      }
-      per100 = food.per100 as unknown as Macros;
-      name = food.name;
-    } else if (b.per100) {
-      per100 = {
-        kcal: Number(b.per100.kcal) || 0,
-        protein: Number(b.per100.protein) || 0,
-        fat: Number(b.per100.fat) || 0,
-        carbs: Number(b.per100.carbs) || 0,
-      };
-      // Persist ad-hoc foods so they can be reused later.
-      if (name) {
-        const food = await prisma.foodItem.create({
-          data: { source: 'manual', name, per100: per100 as object },
-          select: { id: true },
-        });
-        foodItemId = food.id;
-      }
-    }
-
-    if (!per100) {
-      reply.code(400).send({ error: 'bad_request', reason: 'macros_required' });
-      return;
-    }
-
-    const factor = grams / 100;
-    const meal = await prisma.mealLog.create({
-      data: {
-        clientId: auth.userId,
-        date: mealDate,
-        mealType,
-        foodItemId,
-        grams,
-        kcal: per100.kcal * factor,
-        protein: per100.protein * factor,
-        fat: per100.fat * factor,
-        carbs: per100.carbs * factor,
-      },
-      select: { id: true },
-    });
-    return { ok: true, id: meal.id, name };
+    return { ok: true, id: res.id, name: res.name };
   });
 
   // Edit a logged meal: change grams (macros recomputed from the stored
@@ -382,69 +442,7 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Querystring: { q?: string } }>(
     '/client/nutrition/foods/search',
     { preHandler: fastify.requireAuth },
-    async (request) => {
-      const q = (request.query.q ?? '').trim();
-      if (q.length < 2) return { foods: [] };
-      const MAX_RESULTS = 30;
-
-      const foods: Array<{ id: string; name: string; barcode: string | null; per100: Macros }> = [];
-      const seenNames = new Set<string>();
-      const pushFood = (f: { id: string; name: string; barcode: string | null; per100: Macros }) => {
-        const key = f.name.trim().toLowerCase();
-        if (foods.length >= MAX_RESULTS || foods.some((x) => x.id === f.id) || seenNames.has(key)) return;
-        seenNames.add(key);
-        foods.push(f);
-      };
-
-      // FatSecret first when configured — its data is richer. Cache new hits.
-      if (isFatSecretConfigured()) {
-        for (const r of await searchFatSecret(q)) {
-          if (foods.length >= MAX_RESULTS) break;
-          const saved = await prisma.foodItem.upsert({
-            where: { source_externalId: { source: 'fatsecret', externalId: r.externalId } },
-            update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },
-            create: {
-              source: 'fatsecret',
-              externalId: r.externalId,
-              name: r.name,
-              per100: r.per100 as object,
-              barcode: r.barcode,
-            },
-            select: { id: true, name: true, barcode: true, per100: true },
-          });
-          pushFood({ ...saved, per100: saved.per100 as unknown as Macros });
-        }
-      }
-
-      // Then the local cache (instant, offline-friendly).
-      const local = await prisma.foodItem.findMany({
-        where: { name: { contains: q, mode: 'insensitive' } },
-        take: 25,
-        orderBy: { createdAt: 'desc' },
-      });
-      for (const f of local) pushFood({ ...f, per100: f.per100 as unknown as Macros });
-
-      // Finally Open Food Facts to fill any remaining slots.
-      if (foods.length < MAX_RESULTS) {
-        for (const r of await searchOpenFoodFacts(q)) {
-          if (foods.length >= MAX_RESULTS) break;
-          const saved = await prisma.foodItem.upsert({
-            where: { source_externalId: { source: 'openfoodfacts', externalId: r.externalId } },
-            update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },
-            create: {
-              source: 'openfoodfacts',
-              externalId: r.externalId,
-              name: r.name,
-              per100: r.per100 as object,
-              barcode: r.barcode,
-            },
-            select: { id: true, name: true, barcode: true, per100: true },
-          });
-          pushFood({ ...saved, per100: saved.per100 as unknown as Macros });
-        }
-      }
-      return { foods };
-    },
+    async (request) => searchFoodsInternal((request.query.q ?? '').trim()),
   );
 
   fastify.get<{ Params: { code: string } }>(
@@ -529,6 +527,68 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
         return;
       }
       return daySummary(request.params.id, request.query.date);
+    },
+  );
+
+  // Coach-side food search (same sources as the client).
+  fastify.get<{ Querystring: { q?: string } }>(
+    '/coach/nutrition/foods/search',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      return searchFoodsInternal((request.query.q ?? '').trim());
+    },
+  );
+
+  // Coach adds a product/meal to a client's diary.
+  fastify.post<{ Params: { id: string }; Body: MealInput }>(
+    '/coach/clients/:id/nutrition/meals',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const link = await prisma.coachClient.findUnique({
+        where: { coachId_clientId: { coachId: auth.userId, clientId: request.params.id } },
+        select: { status: true },
+      });
+      if (!link) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const res = await logMealInternal(request.params.id, request.body ?? {});
+      if (!res.ok) {
+        reply.code(res.status).send({ error: 'bad_request', reason: res.reason });
+        return;
+      }
+      return { ok: true, id: res.id, name: res.name };
+    },
+  );
+
+  // Coach removes a meal from a client's diary.
+  fastify.delete<{ Params: { id: string; mealId: string } }>(
+    '/coach/clients/:id/nutrition/meals/:mealId',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      const auth = request.auth!;
+      const link = await prisma.coachClient.findUnique({
+        where: { coachId_clientId: { coachId: auth.userId, clientId: request.params.id } },
+        select: { status: true },
+      });
+      if (!link) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const meal = await prisma.mealLog.findUnique({
+        where: { id: request.params.mealId },
+        select: { clientId: true },
+      });
+      if (!meal || meal.clientId !== request.params.id) {
+        reply.code(404).send({ error: 'not_found', reason: 'meal_not_found' });
+        return;
+      }
+      await prisma.mealLog.delete({ where: { id: request.params.mealId } });
+      return { ok: true };
     },
   );
 };

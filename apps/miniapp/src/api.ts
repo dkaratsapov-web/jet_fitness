@@ -611,6 +611,22 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  coachSearchFoods: (q: string) =>
+    request<{ foods: FoodSearchItem[] }>(
+      `/api/coach/nutrition/foods/search?q=${encodeURIComponent(q)}`,
+    ),
+  coachAddMeal: (
+    clientId: string,
+    body: { mealType: MealType; grams: number; foodItemId?: string; name?: string; per100?: Macros; date?: string },
+  ) =>
+    request<{ ok: boolean; id: string }>(`/api/coach/clients/${clientId}/nutrition/meals`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  coachDeleteMeal: (clientId: string, mealId: string) =>
+    request<{ ok: boolean }>(`/api/coach/clients/${clientId}/nutrition/meals/${mealId}`, {
+      method: 'DELETE',
+    }),
 
   // Challenges (Phase 2)
   coachChallenges: () => request<CoachChallenge[]>('/api/coach/challenges'),

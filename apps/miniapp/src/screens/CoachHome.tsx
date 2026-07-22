@@ -12,8 +12,17 @@ import {
   type ProgressPhoto,
   type FormVideo,
   type NutritionDay,
+  type FoodSearchItem,
+  type MealType,
 } from '../api';
 import type { ChatContext } from '../api';
+
+const MEAL_LABELS: Record<MealType, string> = {
+  breakfast: 'Завтрак',
+  lunch: 'Обед',
+  dinner: 'Ужин',
+  snack: 'Перекус',
+};
 import { CoachPrograms } from './CoachPrograms';
 import { CoachPayments } from './CoachPayments';
 import { ChatScreen } from '../components/ChatScreen';
@@ -563,6 +572,7 @@ function CoachClientNutrition({
   const [fat, setFat] = useState('');
   const [carbs, setCarbs] = useState('');
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   function load() {
     api
@@ -644,6 +654,190 @@ function CoachClientNutrition({
           </button>
         </div>
       )}
+
+      {/* meals in the client's diary — coach can remove */}
+      {day && day.meals.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {day.meals.map((m) => (
+            <li key={m.id} className="flex items-center justify-between text-xs bg-tg-bg rounded-lg px-2 py-1.5">
+              <span className="min-w-0 truncate">
+                {m.name} <span className="text-tg-hint">· {m.grams} г · {m.kcal} ккал</span>
+              </span>
+              <button
+                className="text-tg-hint px-1 shrink-0"
+                onClick={async () => {
+                  await api.coachDeleteMeal(clientId, m.id).catch(() => undefined);
+                  load();
+                }}
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <button
+        className="rounded-lg bg-tg-secondaryBg text-brand-accent py-2 text-sm font-medium"
+        onClick={() => setAdding(true)}
+      >
+        ➕ Добавить продукт клиенту
+      </button>
+
+      {adding && (
+        <CoachAddMeal
+          clientId={clientId}
+          onClose={() => setAdding(false)}
+          onAdded={() => {
+            setAdding(false);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Coach adds a product to a client's diary, with an optional comment sent to chat.
+function CoachAddMeal({
+  clientId,
+  onClose,
+  onAdded,
+}: {
+  clientId: string;
+  onClose: () => void;
+  onAdded: () => void;
+}) {
+  const [mealType, setMealType] = useState<MealType>('breakfast');
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState<FoodSearchItem[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [comment, setComment] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function search() {
+    if (q.trim().length < 2) return;
+    setSearching(true);
+    try {
+      const r = await api.coachSearchFoods(q.trim());
+      setResults(r.foods);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function add(food: FoodSearchItem, grams: number) {
+    setBusyId(food.id);
+    try {
+      await api.coachAddMeal(clientId, { mealType, grams, foodItemId: food.id });
+      if (comment.trim()) {
+        await api
+          .coachSendMessage(clientId, `🍽 ${food.name}: ${comment.trim()}`, {
+            contextType: 'nutrition',
+            contextId: new Date().toISOString().slice(0, 10),
+            contextLabel: 'Питание клиента',
+          })
+          .catch(() => undefined);
+      }
+      onAdded();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50" onClick={onClose}>
+      <div
+        className="bg-tg-bg rounded-t-3xl w-full max-w-md p-4 flex flex-col gap-3 max-h-[88vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Добавить продукт клиенту</h2>
+          <button className="text-tg-hint" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="grid grid-cols-4 gap-1">
+          {(Object.keys(MEAL_LABELS) as MealType[]).map((mt) => (
+            <button
+              key={mt}
+              className={`rounded-lg py-2 text-xs ${
+                mealType === mt ? 'bg-tg-button text-tg-buttonText' : 'bg-tg-secondaryBg text-tg-hint'
+              }`}
+              onClick={() => setMealType(mt)}
+            >
+              {MEAL_LABELS[mt]}
+            </button>
+          ))}
+        </div>
+
+        <input
+          className="rounded-xl bg-tg-secondaryBg p-3 text-sm outline-none"
+          placeholder="Комментарий для клиента (по желанию)"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+        />
+
+        <div className="flex gap-2">
+          <input
+            className="flex-1 rounded-xl bg-tg-secondaryBg p-3 outline-none"
+            placeholder="Продукт (напр. «творог 5%»)"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && search()}
+          />
+          <button
+            className="rounded-xl bg-tg-button text-tg-buttonText px-4 text-sm disabled:opacity-60"
+            onClick={search}
+            disabled={searching}
+          >
+            {searching ? '…' : 'Найти'}
+          </button>
+        </div>
+
+        {results && results.length === 0 && (
+          <p className="text-tg-hint text-sm">Ничего не найдено.</p>
+        )}
+        {results?.map((f) => (
+          <CoachFoodRow key={f.id} food={f} busy={busyId === f.id} onAdd={(g) => add(f, g)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CoachFoodRow({
+  food,
+  busy,
+  onAdd,
+}: {
+  food: FoodSearchItem;
+  busy: boolean;
+  onAdd: (grams: number) => void;
+}) {
+  const [grams, setGrams] = useState('100');
+  const kcal = Math.round((food.per100.kcal * (Number(grams) || 0)) / 100);
+  return (
+    <div className="rounded-2xl bg-tg-secondaryBg p-3 flex flex-col gap-2">
+      <div className="text-sm font-medium">{food.name}</div>
+      <div className="text-tg-hint text-xs">
+        {food.per100.kcal} ккал · Б{food.per100.protein} Ж{food.per100.fat} У{food.per100.carbs} / 100 г
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          className="w-20 rounded-lg bg-tg-bg p-2 text-sm outline-none"
+          inputMode="numeric"
+          value={grams}
+          onChange={(e) => setGrams(e.target.value.replace(/[^0-9]/g, ''))}
+        />
+        <span className="text-tg-hint text-xs">г · ≈ {kcal} ккал</span>
+        <button
+          className="ml-auto rounded-lg bg-tg-button text-tg-buttonText px-4 py-2 text-sm disabled:opacity-60"
+          onClick={() => onAdd(Number(grams) || 0)}
+          disabled={busy || !grams}
+        >
+          Добавить
+        </button>
+      </div>
     </div>
   );
 }
