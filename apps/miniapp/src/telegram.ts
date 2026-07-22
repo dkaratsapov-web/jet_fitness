@@ -23,6 +23,16 @@ interface TelegramWebApp {
   expand: () => void;
   onEvent: (event: string, handler: () => void) => void;
   BackButton: { show: () => void; hide: () => void; onClick: (cb: () => void) => void };
+  showScanQrPopup?: (
+    params: { text?: string },
+    callback?: (text: string) => boolean | void,
+  ) => void;
+  closeScanQrPopup?: () => void;
+  HapticFeedback?: {
+    impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
+    notificationOccurred?: (type: 'error' | 'success' | 'warning') => void;
+    selectionChanged?: () => void;
+  };
 }
 
 declare global {
@@ -38,6 +48,45 @@ export function getWebApp(): TelegramWebApp | null {
 /** The signed initData string, or '' when opened outside Telegram. */
 export function getInitData(): string {
   return getWebApp()?.initData ?? '';
+}
+
+/** Light haptic feedback; no-op outside Telegram. */
+export function haptic(type: 'success' | 'error' | 'warning' | 'tap' = 'tap'): void {
+  const h = getWebApp()?.HapticFeedback;
+  if (!h) return;
+  if (type === 'tap') h.impactOccurred?.('light');
+  else h.notificationOccurred?.(type);
+}
+
+/**
+ * Scan a barcode/QR via Telegram's native scanner. Resolves with the decoded
+ * string (digits for product barcodes) or null if closed/unsupported. Falls
+ * back to a manual prompt when the native scanner isn't available.
+ */
+export function scanBarcode(): Promise<string | null> {
+  const wa = getWebApp();
+  if (!wa?.showScanQrPopup) {
+    const manual = window.prompt('Введите штрихкод (цифры с упаковки)');
+    return Promise.resolve(manual ? manual.replace(/[^0-9]/g, '') : null);
+  }
+  return new Promise((resolve) => {
+    let done = false;
+    wa.showScanQrPopup!({ text: 'Наведите на штрихкод продукта' }, (text) => {
+      const digits = (text || '').replace(/[^0-9]/g, '');
+      // Product barcodes are 8–14 digits; ignore anything else and keep scanning.
+      if (digits.length >= 8 && digits.length <= 14) {
+        done = true;
+        wa.closeScanQrPopup?.();
+        resolve(digits);
+        return true;
+      }
+      return false;
+    });
+    // If the user closes the popup without a valid scan.
+    wa.onEvent('scanQrPopupClosed', () => {
+      if (!done) resolve(null);
+    });
+  });
 }
 
 /*

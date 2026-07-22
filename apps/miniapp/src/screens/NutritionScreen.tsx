@@ -9,6 +9,7 @@ import {
 } from '../api';
 import { LineChart } from '../components/LineChart';
 import { Ring } from '../components/Ring';
+import { scanBarcode, haptic } from '../telegram';
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Завтрак',
@@ -504,6 +505,23 @@ function AddMealModal({
     }
   }
 
+  async function scanAndLookup() {
+    setError(null);
+    const code = await scanBarcode();
+    if (!code) return;
+    setSearching(true);
+    try {
+      const r = await api.lookupBarcode(code);
+      setResults([r.food]);
+      haptic('success');
+    } catch {
+      setError(`Штрихкод ${code} не найден. Попробуй поиск по названию или добавь вручную.`);
+      haptic('error');
+    } finally {
+      setSearching(false);
+    }
+  }
+
   async function addFromFood(food: FoodSearchItem, g: number) {
     setBusy(true);
     try {
@@ -603,6 +621,13 @@ function AddMealModal({
                 {searching ? '…' : 'Найти'}
               </button>
             </div>
+            <button
+              className="rounded-xl bg-brand-surface2 brand-line text-brand-accent py-2.5 text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+              onClick={scanAndLookup}
+              disabled={searching}
+            >
+              <span className="text-base">▮▬▮</span> Сканировать штрихкод
+            </button>
             {results && results.length === 0 && (
               <p className="text-tg-hint text-sm">
                 Ничего не найдено. Попробуйте другое название или добавьте вручную.
