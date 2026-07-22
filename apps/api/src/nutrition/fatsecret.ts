@@ -214,7 +214,7 @@ export async function searchFatSecret(query: string): Promise<FoodHit[]> {
     method: 'foods.search',
     search_expression: query,
     format: 'json',
-    max_results: '15',
+    max_results: '30',
   });
   if (env.fatSecretRegion) params.set('region', env.fatSecretRegion);
   if (env.fatSecretLanguage) params.set('language', env.fatSecretLanguage);

@@ -87,7 +87,7 @@ export async function lookupBarcode(code: string): Promise<FoodHit | null> {
 export async function searchOpenFoodFacts(query: string): Promise<FoodHit[]> {
   const url =
     `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(query)}` +
-    `&search_simple=1&action=process&json=1&page_size=10` +
+    `&search_simple=1&action=process&json=1&page_size=30` +
     `&fields=code,product_name,product_name_ru,nutriments`;
   const data = (await offFetch(url)) as { products?: OffProduct[] } | null;
   if (!data?.products) return [];

@@ -385,12 +385,13 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
     async (request) => {
       const q = (request.query.q ?? '').trim();
       if (q.length < 2) return { foods: [] };
+      const MAX_RESULTS = 30;
 
       const foods: Array<{ id: string; name: string; barcode: string | null; per100: Macros }> = [];
       const seenNames = new Set<string>();
       const pushFood = (f: { id: string; name: string; barcode: string | null; per100: Macros }) => {
         const key = f.name.trim().toLowerCase();
-        if (foods.length >= 15 || foods.some((x) => x.id === f.id) || seenNames.has(key)) return;
+        if (foods.length >= MAX_RESULTS || foods.some((x) => x.id === f.id) || seenNames.has(key)) return;
         seenNames.add(key);
         foods.push(f);
       };
@@ -398,7 +399,7 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
       // FatSecret first when configured — its data is richer. Cache new hits.
       if (isFatSecretConfigured()) {
         for (const r of await searchFatSecret(q)) {
-          if (foods.length >= 15) break;
+          if (foods.length >= MAX_RESULTS) break;
           const saved = await prisma.foodItem.upsert({
             where: { source_externalId: { source: 'fatsecret', externalId: r.externalId } },
             update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },
@@ -418,15 +419,15 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
       // Then the local cache (instant, offline-friendly).
       const local = await prisma.foodItem.findMany({
         where: { name: { contains: q, mode: 'insensitive' } },
-        take: 10,
+        take: 25,
         orderBy: { createdAt: 'desc' },
       });
       for (const f of local) pushFood({ ...f, per100: f.per100 as unknown as Macros });
 
       // Finally Open Food Facts to fill any remaining slots.
-      if (foods.length < 15) {
+      if (foods.length < MAX_RESULTS) {
         for (const r of await searchOpenFoodFacts(q)) {
-          if (foods.length >= 15) break;
+          if (foods.length >= MAX_RESULTS) break;
           const saved = await prisma.foodItem.upsert({
             where: { source_externalId: { source: 'openfoodfacts', externalId: r.externalId } },
             update: { name: r.name, per100: r.per100 as object, barcode: r.barcode },

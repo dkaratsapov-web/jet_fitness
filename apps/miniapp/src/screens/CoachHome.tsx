@@ -16,7 +16,6 @@ import {
 import type { ChatContext } from '../api';
 import { CoachPrograms } from './CoachPrograms';
 import { CoachPayments } from './CoachPayments';
-import { CoachChallenges } from './CoachChallenges';
 import { ChatScreen } from '../components/ChatScreen';
 import { LogoMark } from '../components/Logo';
 import { RoleSwitch } from '../components/RoleSwitch';
@@ -29,7 +28,7 @@ const STATUS_LABEL: Record<CoachClient['status'], string> = {
   ended: 'завершён',
 };
 
-type Tab = 'clients' | 'programs' | 'payments' | 'challenges';
+type Tab = 'clients' | 'programs' | 'nutrition' | 'payments';
 
 // A chat opened with one client, optionally pre-scoped to a context.
 export interface CoachChat {
@@ -118,18 +117,18 @@ export function CoachHome({
         <TabButton active={tab === 'programs'} onClick={() => setTab('programs')}>
           Программы
         </TabButton>
+        <TabButton active={tab === 'nutrition'} onClick={() => setTab('nutrition')}>
+          Питание
+        </TabButton>
         <TabButton active={tab === 'payments'} onClick={() => setTab('payments')}>
           Оплаты
-        </TabButton>
-        <TabButton active={tab === 'challenges'} onClick={() => setTab('challenges')}>
-          Челленджи
         </TabButton>
       </nav>
 
       {tab === 'clients' && <ClientsTab onOpenChat={setChat} />}
       {tab === 'programs' && <CoachPrograms />}
+      {tab === 'nutrition' && <CoachNutrition onOpenChat={setChat} />}
       {tab === 'payments' && <CoachPayments />}
-      {tab === 'challenges' && <CoachChallenges />}
     </div>
   );
 }
@@ -490,6 +489,62 @@ function ClientRow({
         </div>
       )}
     </li>
+  );
+}
+
+// Питание-таб тренера: выбрать клиента → цель, дневник и связь по питанию.
+function CoachNutrition({ onOpenChat }: { onOpenChat: (c: CoachChat) => void }) {
+  const [clients, setClients] = useState<CoachClient[] | null>(null);
+  const [sel, setSel] = useState<CoachClient | null>(null);
+
+  useEffect(() => {
+    api.coachClients().then(setClients).catch(() => setClients([]));
+  }, []);
+
+  const active = (clients ?? []).filter((c) => c.status === 'active' || c.status === 'paused');
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <label className="text-tg-hint text-xs">Клиент</label>
+        <select
+          className="w-full mt-1 rounded-xl bg-tg-secondaryBg p-3 outline-none"
+          value={sel?.id ?? ''}
+          onChange={(e) => setSel(active.find((c) => c.id === e.target.value) ?? null)}
+        >
+          <option value="" disabled>
+            {clients === null ? 'Загрузка…' : active.length ? 'Выберите клиента…' : 'Нет активных клиентов'}
+          </option>
+          {active.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.firstName ?? 'Клиент'}
+              {c.username ? ` @${c.username}` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {sel ? (
+        <CoachClientNutrition
+          clientId={sel.id}
+          onComment={() =>
+            onOpenChat({
+              clientId: sel.id,
+              name: sel.firstName ?? 'Клиент',
+              context: {
+                contextType: 'nutrition',
+                contextId: new Date().toISOString().slice(0, 10),
+                contextLabel: 'Питание клиента',
+              },
+            })
+          }
+        />
+      ) : (
+        <p className="text-tg-hint text-sm">
+          Выберите клиента, чтобы задать цель по КБЖУ и видеть его дневник питания.
+        </p>
+      )}
+    </div>
   );
 }
 
