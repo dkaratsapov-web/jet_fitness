@@ -20,6 +20,15 @@ type State =
 // regardless of role.
 const SPLASH_MIN_MS = 2800;
 
+// A user's role comes from their Telegram id (the server returns their roles).
+// We enter the highest-privilege role automatically — no "choose a role" wall.
+// Multi-role accounts (e.g. the owner) can still switch via the ⇄ button.
+const ROLE_PRIORITY: AppRole[] = ['owner', 'coach', 'client'];
+function primaryRole(roles: AppRole[]): AppRole | null {
+  for (const r of ROLE_PRIORITY) if (roles.includes(r)) return r;
+  return roles[0] ?? null;
+}
+
 export function App() {
   const [state, setState] = useState<State>({ phase: 'loading' });
   const [activeRole, setActiveRole] = useState<AppRole | null>(null);
@@ -36,7 +45,7 @@ export function App() {
       .session()
       .then((session) => {
         setState({ phase: 'ready', session });
-        if (autoSelect && session.roles.length === 1) setActiveRole(session.roles[0]);
+        if (autoSelect && session.roles.length >= 1) setActiveRole(primaryRole(session.roles));
         return session;
       })
       .catch((err: unknown) => {
