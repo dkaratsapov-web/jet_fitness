@@ -32,8 +32,8 @@ export function OwnerHome({
     <div className="flex flex-col gap-4 p-4">
       <header className="flex items-start justify-between">
         <div>
-          <p className="text-tg-hint text-sm">Панель владельца платформы</p>
-          <h1 className="text-2xl font-semibold">Привет, {name}!</h1>
+          <p className="jf-eyebrow mb-0.5">Владелец платформы</p>
+          <h1 className="text-lg font-bold">Привет, {name}!</h1>
         </div>
         <RoleSwitch onClick={onSwitchRole} />
       </header>
