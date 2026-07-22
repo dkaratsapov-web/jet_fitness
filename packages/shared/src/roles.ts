@@ -29,10 +29,11 @@ export interface SessionResponse {
  * Parse a deep-link start param.
  *   "invite_ab12cd" => coach→client invite
  *   "coach_ab12cd"  => owner→coach onboarding invite
+ *   "client"        => solo client self-registration (owner-shared link)
  */
 export function parseStartParam(
   startParam: string | undefined | null,
-): { kind: 'invite' | 'coach_invite'; token: string } | null {
+): { kind: 'invite' | 'coach_invite' | 'client_register'; token: string } | null {
   if (!startParam) return null;
   const invitePrefix = 'invite_';
   if (startParam.startsWith(invitePrefix)) {
@@ -43,6 +44,9 @@ export function parseStartParam(
   if (startParam.startsWith(coachPrefix)) {
     const token = startParam.slice(coachPrefix.length);
     if (token) return { kind: 'coach_invite', token };
+  }
+  if (startParam === 'client') {
+    return { kind: 'client_register', token: '' };
   }
   return null;
 }

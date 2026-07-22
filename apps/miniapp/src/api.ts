@@ -1028,6 +1028,7 @@ export const api = {
     request<{ fatsecret: FatSecretDiagnostics }>('/api/owner/diagnostics'),
   ownerCoaches: () => request<OwnerCoach[]>('/api/owner/coaches'),
   ownerClients: () => request<OwnerClientRow[]>('/api/owner/clients'),
+  ownerClientInvite: () => request<{ deepLink: string }>('/api/owner/client-invite'),
   ownerCoachInvites: () => request<CoachOnboardInvite[]>('/api/owner/coach-invites'),
   createCoachInvite: (note?: string) =>
     request<{ token: string; deepLink: string; expiresAt: string }>('/api/owner/coach-invites', {

@@ -341,6 +341,7 @@ function Clients() {
 
   return (
     <div className="flex flex-col gap-2">
+      <InviteClient />
       {items === null ? (
         <p className="text-tg-hint text-sm">Загрузка…</p>
       ) : items.length === 0 ? (
@@ -356,6 +357,56 @@ function Clients() {
             onChanged={load}
           />
         ))
+      )}
+    </div>
+  );
+}
+
+function InviteClient() {
+  const [link, setLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function make() {
+    const r = await api.ownerClientInvite();
+    setLink(r.deepLink);
+  }
+  function copy() {
+    if (!link) return;
+    navigator.clipboard?.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  return (
+    <div className="jf-card p-3 flex flex-col gap-2">
+      <div className="font-semibold text-sm">Пригласить клиента</div>
+      <p className="text-brand-muted text-xs">
+        Клиент откроет ссылку и войдёт как самостоятельный (без тренера). Тренера можно
+        подключить позже.
+      </p>
+      {link ? (
+        <div className="flex items-center gap-2">
+          <input
+            className="flex-1 min-w-0 rounded-xl bg-brand-surface2 brand-line p-2 text-xs outline-none"
+            readOnly
+            value={link}
+            onFocus={(e) => e.target.select()}
+          />
+          <button
+            className="rounded-xl bg-brand-accent text-brand-onAccent px-3 py-2 text-xs font-semibold jf-press"
+            onClick={copy}
+          >
+            {copied ? '✓' : 'Копир.'}
+          </button>
+        </div>
+      ) : (
+        <button
+          className="self-start rounded-xl bg-brand-surface2 brand-line px-3 py-2 text-sm text-brand-accent jf-press"
+          onClick={make}
+        >
+          Получить ссылку
+        </button>
       )}
     </div>
   );

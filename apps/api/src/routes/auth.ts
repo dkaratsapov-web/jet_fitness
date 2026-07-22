@@ -56,6 +56,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
         await bindInvite(auth.userId, start.token, fastify.log);
       } else if (start?.kind === 'coach_invite') {
         await bindCoachInvite(auth.userId, start.token, fastify.log);
+      } else if (start?.kind === 'client_register') {
+        // Solo client self-registration via an owner-shared link.
+        await prisma.clientProfile.upsert({
+          where: { userId: auth.userId },
+          update: {},
+          create: { userId: auth.userId },
+        });
       }
 
       // Re-read the user (invite binding may have created a client relationship).

@@ -119,23 +119,45 @@ export function OliviaTip({
  * Floating Olivia assistant button — always reachable above the tab bar on
  * every client screen. This is the app's "assistant is always here" anchor.
  */
-export function OliviaFab({ onClick, label = 'Оливия' }: { onClick: () => void; label?: string }) {
+export function OliviaFab({ onClick }: { onClick: () => void }) {
+  const [hidden, setHidden] = useState(false);
+
+  // Auto-hide while scrolling down (so it never sits on top of content the user
+  // is reading), reappear when scrolling stops / up.
+  useEffect(() => {
+    let last = window.scrollY;
+    let t: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y > last + 6) setHidden(true);
+      else if (y < last - 6) setHidden(false);
+      last = y;
+      clearTimeout(t);
+      t = setTimeout(() => setHidden(false), 700);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      clearTimeout(t);
+    };
+  }, []);
+
   return (
     <button
       onClick={onClick}
       aria-label="Оливия — помощник"
-      className="fixed right-4 bottom-24 z-40 flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full jf-press"
+      className="fixed right-3.5 bottom-[5.5rem] z-40 rounded-full jf-press transition-all duration-300"
       style={{
-        background: 'linear-gradient(180deg, var(--surface-2), var(--surface))',
-        border: '1px solid color-mix(in srgb, var(--accent) 40%, transparent)',
-        boxShadow: '0 10px 26px -10px rgba(0,0,0,0.8), 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent)',
+        opacity: hidden ? 0 : 1,
+        transform: hidden ? 'translateY(12px) scale(0.9)' : 'none',
+        pointerEvents: hidden ? 'none' : 'auto',
+        boxShadow: '0 8px 22px -8px rgba(0,0,0,0.85)',
       }}
     >
-      <span className="relative">
-        <OliviaAvatar size={40} />
-        <span className="absolute -top-0.5 -right-0.5 jf-live" />
+      <span className="relative block">
+        <OliviaAvatar size={46} />
+        <span className="absolute top-0 right-0 jf-live" />
       </span>
-      <span className="text-sm font-bold pr-0.5">{label}</span>
     </button>
   );
 }

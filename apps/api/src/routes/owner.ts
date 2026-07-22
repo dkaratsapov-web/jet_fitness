@@ -25,6 +25,15 @@ export const ownerRoutes: FastifyPluginAsync = async (fastify) => {
     return { fatsecret: await fatSecretDiagnostics() };
   });
 
+  // ── Client self-registration link ───────────────────────────────
+  // A shareable (reusable) link; opening it registers the user as a solo client.
+  fastify.get('/owner/client-invite', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    if (!(await requireOwner(request, reply))) return;
+    return {
+      deepLink: env.botUsername ? `https://t.me/${env.botUsername}?start=client` : `?start=client`,
+    };
+  });
+
   // ── Coach onboarding invites ────────────────────────────────────
   // Owner issues a one-time deep-link; opening it grants the coach role.
   fastify.post<{ Body: { note?: string } }>(
