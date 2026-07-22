@@ -27,7 +27,8 @@ import { ChatScreen } from '../components/ChatScreen';
 import { BottomNav, type ClientTab } from '../components/BottomNav';
 import { RoleSwitch } from '../components/RoleSwitch';
 import { LiveDot, Sparkline } from '../components/ui';
-import { OliviaTip } from '../components/Olivia';
+import { OliviaTip, OliviaAvatar } from '../components/Olivia';
+import { OliviaHelp } from '../components/OliviaHelp';
 import type { NutritionDay, ProgressEntry, ChatContext } from '../api';
 
 // Time-of-day greeting (client is in the user's local tz).
@@ -247,6 +248,7 @@ function HomeTab({
   needsOnboarding: boolean;
   onOnboarded: () => void;
 }) {
+  const [helpOpen, setHelpOpen] = useState(false);
   return (
     <div className="flex flex-col gap-4 p-4">
       <header className="jf-rise flex items-start justify-between">
@@ -257,6 +259,13 @@ function HomeTab({
           <h1 className="text-2xl font-bold mt-0.5">{name}</h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            className="w-9 h-9 rounded-xl grid place-items-center bg-brand-surface brand-line overflow-hidden"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Спросить Оливию"
+          >
+            <OliviaAvatar size={30} ring={false} />
+          </button>
           <button
             className="relative w-9 h-9 rounded-xl grid place-items-center bg-brand-surface brand-line text-brand-accent"
             onClick={onNotifications}
@@ -322,6 +331,17 @@ function HomeTab({
 
       {challenges.length > 0 && <Challenges items={challenges} />}
       {history.length > 0 && <History items={history} />}
+
+      {helpOpen && (
+        <OliviaHelp
+          role="client"
+          onClose={() => setHelpOpen(false)}
+          onAskCoach={() => {
+            setHelpOpen(false);
+            openChat(null);
+          }}
+        />
+      )}
     </div>
   );
 }

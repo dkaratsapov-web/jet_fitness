@@ -18,7 +18,7 @@ type State =
 // Minimum time the Olivia splash stays up, so the branded moment actually
 // plays even when the session loads in milliseconds. Shown to everyone on open,
 // regardless of role.
-const SPLASH_MIN_MS = 2800;
+const SPLASH_MIN_MS = 6000;
 
 // A user's role comes from their Telegram id (the server returns their roles).
 // We enter the highest-privilege role automatically — no "choose a role" wall.
