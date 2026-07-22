@@ -584,6 +584,40 @@ function scheduleTimes(schedule: unknown): string[] {
   return [];
 }
 
+// Last-14-days intake calendar: a filled cell = taken that day, today outlined.
+function IntakeCalendar({ days }: { days: string[] }) {
+  const set = new Set(days);
+  const today = new Date();
+  const cells = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (13 - i));
+    const key = d.toISOString().slice(0, 10);
+    return { key, day: d.getDate(), taken: set.has(key), isToday: i === 13 };
+  });
+  return (
+    <div className="flex items-center gap-[3px]">
+      {cells.map((c) => (
+        <div
+          key={c.key}
+          title={c.key}
+          className="flex-1 h-5 rounded-[4px] grid place-items-center text-[8px] font-bold tabular"
+          style={
+            c.taken
+              ? { background: 'var(--accent)', color: 'var(--on-accent)' }
+              : {
+                  background: 'var(--surface-2)',
+                  color: 'var(--muted)',
+                  border: c.isToday ? '1px solid var(--energy)' : '1px solid transparent',
+                }
+          }
+        >
+          {c.day}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SupplementsContent({ onRevoked }: { onRevoked: () => void }) {
   const [items, setItems] = useState<Supplement[] | null>(null);
   function load() {
@@ -593,6 +627,10 @@ function SupplementsContent({ onRevoked }: { onRevoked: () => void }) {
 
   async function taken(id: string) {
     await api.markIntake(id).catch(() => undefined);
+    load();
+  }
+  async function undo(id: string) {
+    await api.unmarkIntake(id).catch(() => undefined);
     load();
   }
   async function remove(id: string) {
@@ -617,12 +655,17 @@ function SupplementsContent({ onRevoked }: { onRevoked: () => void }) {
             const goal = times.length || 1;
             const done = Math.min(s.takenToday, goal);
             return (
-              <li key={s.id} className="jf-card p-3 flex flex-col gap-2">
+              <li key={s.id} className="jf-card p-3 flex flex-col gap-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-medium text-sm">
+                    <div className="font-semibold text-sm">
                       {s.name}
-                      {s.dose && <span className="text-brand-muted font-normal"> · {s.dose}</span>}
+                      {(s.dose || s.amount) && (
+                        <span className="text-brand-muted font-normal">
+                          {' · '}
+                          {[s.dose, s.amount].filter(Boolean).join(' · ')}
+                        </span>
+                      )}
                     </div>
                     {times.length > 0 ? (
                       <div className="flex gap-1 flex-wrap mt-1">
@@ -645,7 +688,10 @@ function SupplementsContent({ onRevoked }: { onRevoked: () => void }) {
                   </button>
                 </div>
 
-                {/* today's progress */}
+                {/* 14-day intake calendar */}
+                <IntakeCalendar days={s.intakeDays} />
+
+                {/* today's progress + controls */}
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 rounded-full bg-brand-surface2 overflow-hidden">
                     <div
@@ -657,10 +703,18 @@ function SupplementsContent({ onRevoked }: { onRevoked: () => void }) {
                     {done}/{goal} сегодня
                   </span>
                   <button
-                    className="rounded-lg bg-brand-accent text-brand-onAccent px-3 py-1.5 text-sm font-semibold"
+                    className="w-8 h-8 rounded-lg bg-brand-surface2 brand-line text-brand-text disabled:opacity-30"
+                    onClick={() => undo(s.id)}
+                    disabled={s.takenToday <= 0}
+                    aria-label="Отменить приём"
+                  >
+                    −
+                  </button>
+                  <button
+                    className="rounded-lg bg-brand-accent text-brand-onAccent px-3 py-1.5 text-sm font-semibold jf-press"
                     onClick={() => taken(s.id)}
                   >
-                    Принял
+                    Выпил
                   </button>
                 </div>
               </li>
@@ -682,6 +736,7 @@ function SupplementsContent({ onRevoked }: { onRevoked: () => void }) {
 function AddSupplement({ onAdded }: { onAdded: () => void }) {
   const [name, setName] = useState('');
   const [dose, setDose] = useState('');
+  const [amount, setAmount] = useState('');
   const [times, setTimes] = useState<string[]>([]);
   const [custom, setCustom] = useState('');
   const [busy, setBusy] = useState(false);
@@ -703,11 +758,13 @@ function AddSupplement({ onAdded }: { onAdded: () => void }) {
       await api.addSupplement({
         name: name.trim(),
         dose: dose.trim() || undefined,
+        amount: amount.trim() || undefined,
         remindersOn: times.length > 0,
         schedule: times.length > 0 ? { times } : undefined,
       });
       setName('');
       setDose('');
+      setAmount('');
       setTimes([]);
       onAdded();
     } finally {
@@ -729,6 +786,12 @@ function AddSupplement({ onAdded }: { onAdded: () => void }) {
           placeholder="Дозировка (2000 МЕ)"
           value={dose}
           onChange={(e) => setDose(e.target.value)}
+        />
+        <input
+          className="rounded-lg bg-tg-bg p-2 text-sm outline-none"
+          placeholder="Количество (1 шт, 5 г)"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
         />
       </div>
 

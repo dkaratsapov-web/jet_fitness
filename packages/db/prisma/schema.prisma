@@ -497,7 +497,8 @@ model SupplementLog {
   id          String            @id @default(cuid())
   clientId    String
   name        String
-  dose        String?
+  dose        String?           // dosage, e.g. "2000 МЕ"
+  amount      String?           // quantity per intake, e.g. "1 шт", "5 г"
   schedule    Json?             // { times: ["08:00","20:00"], days: [...] }
   createdBy   SupplementCreator @default(self)
   remindersOn Boolean           @default(false)

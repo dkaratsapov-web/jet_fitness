@@ -272,7 +272,7 @@ export const healthModuleRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // ── Supplements (neutral journal) ───────────────────────────────
-  fastify.post<{ Body: { name?: string; dose?: string; schedule?: unknown; remindersOn?: boolean } }>(
+  fastify.post<{ Body: { name?: string; dose?: string; amount?: string; schedule?: unknown; remindersOn?: boolean } }>(
     '/client/health/supplements',
     { preHandler: fastify.requireAuth },
     async (request, reply) => {
@@ -287,6 +287,7 @@ export const healthModuleRoutes: FastifyPluginAsync = async (fastify) => {
           clientId: request.auth!.userId,
           name: b.name.trim(),
           dose: b.dose?.trim() || null,
+          amount: b.amount?.trim() || null,
           schedule: (b.schedule as object) ?? undefined,
           createdBy: 'self' as SupplementCreator,
           remindersOn: Boolean(b.remindersOn),
@@ -301,18 +302,22 @@ export const healthModuleRoutes: FastifyPluginAsync = async (fastify) => {
     if (!(await requireConsent(request, reply))) return;
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
+    const since = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000);
     const rows = await prisma.supplementLog.findMany({
       where: { clientId: request.auth!.userId },
       orderBy: { createdAt: 'desc' },
-      include: { intakes: { where: { takenAt: { gte: dayStart } }, select: { id: true, takenAt: true } } },
+      include: { intakes: { where: { takenAt: { gte: since } }, select: { takenAt: true } } },
     });
     return rows.map((s) => ({
       id: s.id,
       name: s.name,
       dose: s.dose,
+      amount: s.amount,
       schedule: s.schedule,
       remindersOn: s.remindersOn,
-      takenToday: s.intakes.length,
+      takenToday: s.intakes.filter((i) => i.takenAt >= dayStart).length,
+      // Distinct days (last 14) with at least one intake — for the mini calendar.
+      intakeDays: [...new Set(s.intakes.map((i) => i.takenAt.toISOString().slice(0, 10)))],
     }));
   });
 
@@ -330,6 +335,32 @@ export const healthModuleRoutes: FastifyPluginAsync = async (fastify) => {
         return;
       }
       await prisma.supplementIntake.create({ data: { supplementLogId: request.params.id } });
+      return { ok: true };
+    },
+  );
+
+  // Undo the most recent intake for today (control: "выпил / не выпил").
+  fastify.delete<{ Params: { id: string } }>(
+    '/client/health/supplements/:id/intake',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireConsent(request, reply))) return;
+      const log = await prisma.supplementLog.findUnique({
+        where: { id: request.params.id },
+        select: { clientId: true },
+      });
+      if (!log || log.clientId !== request.auth!.userId) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const last = await prisma.supplementIntake.findFirst({
+        where: { supplementLogId: request.params.id, takenAt: { gte: dayStart } },
+        orderBy: { takenAt: 'desc' },
+        select: { id: true },
+      });
+      if (last) await prisma.supplementIntake.delete({ where: { id: last.id } });
       return { ok: true };
     },
   );

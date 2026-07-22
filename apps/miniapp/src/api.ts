@@ -333,9 +333,11 @@ export interface Supplement {
   id: string;
   name: string;
   dose: string | null;
+  amount: string | null;
   schedule: unknown;
   remindersOn: boolean;
   takenToday: number;
+  intakeDays: string[]; // YYYY-MM-DD days (last 14) with ≥1 intake
 }
 
 export type ActivityType =
@@ -911,6 +913,7 @@ export const api = {
   addSupplement: (body: {
     name: string;
     dose?: string;
+    amount?: string;
     remindersOn?: boolean;
     schedule?: { times: string[] };
   }) =>
@@ -920,6 +923,8 @@ export const api = {
     }),
   markIntake: (id: string) =>
     request<{ ok: boolean }>(`/api/client/health/supplements/${id}/intake`, { method: 'POST' }),
+  unmarkIntake: (id: string) =>
+    request<{ ok: boolean }>(`/api/client/health/supplements/${id}/intake`, { method: 'DELETE' }),
   deleteSupplement: (id: string) =>
     request<{ ok: boolean }>(`/api/client/health/supplements/${id}`, { method: 'DELETE' }),
   exportHealth: () => request<unknown>('/api/client/health/export'),
