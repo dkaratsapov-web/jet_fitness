@@ -5,6 +5,7 @@ import {
   type ProgramDraft,
   type ProgramDraftDay,
 } from '../api';
+import { ExerciseDetail } from '../components/ExerciseDetail';
 
 // Local editable rows (superset of what we send to the API).
 interface DraftExRow {
@@ -14,6 +15,7 @@ interface DraftExRow {
   reps: string;
   weight: string;
   restSec: string;
+  tempo: string;
   notes: string;
 }
 interface DraftDay {
@@ -41,6 +43,7 @@ export function ProgramBuilder({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(editId));
+  const [preview, setPreview] = useState<ExerciseLite | null>(null);
 
   useEffect(() => {
     api.exercises().then(setLibrary).catch(() => setLibrary([]));
@@ -65,6 +68,7 @@ export function ProgramBuilder({
                   reps: ex.reps ?? '',
                   weight: ex.weight ?? '',
                   restSec: ex.restSec != null ? String(ex.restSec) : '',
+                  tempo: ex.tempo ?? '',
                   notes: ex.notes ?? '',
                 })),
               }))
@@ -99,6 +103,7 @@ export function ProgramBuilder({
                   reps: '8-12',
                   weight: '',
                   restSec: '90',
+                  tempo: '',
                   notes: '',
                 },
               ],
@@ -125,6 +130,32 @@ export function ProgramBuilder({
         i === di ? { ...day, exercises: day.exercises.filter((_, j) => j !== ei) } : day,
       ),
     );
+  }
+  function moveExercise(di: number, ei: number, dir: -1 | 1) {
+    setDays((d) =>
+      d.map((day, i) => {
+        if (i !== di) return day;
+        const j = ei + dir;
+        if (j < 0 || j >= day.exercises.length) return day;
+        const list = [...day.exercises];
+        [list[ei], list[j]] = [list[j], list[ei]];
+        return { ...day, exercises: list };
+      }),
+    );
+  }
+  function duplicateExercise(di: number, ei: number) {
+    setDays((d) =>
+      d.map((day, i) => {
+        if (i !== di) return day;
+        const list = [...day.exercises];
+        list.splice(ei + 1, 0, { ...day.exercises[ei] });
+        return { ...day, exercises: list };
+      }),
+    );
+  }
+  function previewExercise(exerciseId: string) {
+    const ex = (library ?? []).find((e) => e.id === exerciseId);
+    if (ex) setPreview(ex);
   }
 
   const totalExercises = days.reduce((n, d) => n + d.exercises.length, 0);
@@ -153,6 +184,7 @@ export function ProgramBuilder({
               reps: ex.reps.trim() || null,
               weight: ex.weight.trim() || null,
               restSec: ex.restSec ? Number(ex.restSec) : null,
+              tempo: ex.tempo.trim() || null,
               notes: ex.notes.trim() || null,
             })),
           }),
@@ -233,14 +265,16 @@ export function ProgramBuilder({
 
           {day.exercises.map((ex, ei) => (
             <div key={ei} className="rounded-xl bg-tg-bg p-2 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-sm">{ex.name}</span>
-                <button
-                  className="text-tg-hint text-xs px-1"
-                  onClick={() => removeExercise(di, ei)}
-                >
-                  ✕
-                </button>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-sm min-w-0 truncate">
+                  <span className="text-tg-hint mr-1">{ei + 1}.</span>{ex.name}
+                </span>
+                <div className="flex items-center gap-0.5 shrink-0 text-tg-hint">
+                  <button className="px-1.5 disabled:opacity-30" onClick={() => moveExercise(di, ei, -1)} disabled={ei === 0} title="Выше">↑</button>
+                  <button className="px-1.5 disabled:opacity-30" onClick={() => moveExercise(di, ei, 1)} disabled={ei === day.exercises.length - 1} title="Ниже">↓</button>
+                  <button className="px-1.5" onClick={() => duplicateExercise(di, ei)} title="Дублировать">⧉</button>
+                  <button className="px-1.5" onClick={() => removeExercise(di, ei)} title="Удалить">✕</button>
+                </div>
               </div>
               <div className="grid grid-cols-4 gap-2">
                 <Field label="Подх." value={ex.sets} onChange={(v) => updateExercise(di, ei, { sets: v })} inputMode="numeric" />
@@ -248,6 +282,24 @@ export function ProgramBuilder({
                 <Field label="Вес" value={ex.weight} onChange={(v) => updateExercise(di, ei, { weight: v })} />
                 <Field label="Отдых,с" value={ex.restSec} onChange={(v) => updateExercise(di, ei, { restSec: v })} inputMode="numeric" />
               </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="Темп" value={ex.tempo} onChange={(v) => updateExercise(di, ei, { tempo: v })} />
+                <label className="col-span-2 flex flex-col gap-1">
+                  <span className="text-tg-hint text-[10px] uppercase tracking-wide">Заметка тренера</span>
+                  <input
+                    className="rounded-lg bg-tg-secondaryBg p-1.5 text-sm outline-none w-full"
+                    placeholder="напр. «медленно, без рывка»"
+                    value={ex.notes}
+                    onChange={(e) => updateExercise(di, ei, { notes: e.target.value })}
+                  />
+                </label>
+              </div>
+              <button
+                className="self-start text-brand-accent text-xs font-medium"
+                onClick={() => previewExercise(ex.exerciseId)}
+              >
+                ▶ Техника
+              </button>
             </div>
           ))}
 
@@ -268,6 +320,8 @@ export function ProgramBuilder({
       >
         {saving ? 'Сохраняем…' : 'Сохранить программу'}
       </button>
+
+      {preview && <ExerciseDetail ex={preview} onClose={() => setPreview(null)} />}
     </div>
   );
 }

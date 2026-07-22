@@ -114,6 +114,7 @@ export interface ProgramDraftExercise {
   reps?: string | null;
   weight?: string | null;
   restSec?: number | null;
+  tempo?: string | null;
   notes?: string | null;
 }
 export interface ProgramDraftDay {
