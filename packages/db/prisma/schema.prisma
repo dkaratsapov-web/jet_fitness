@@ -395,6 +395,44 @@ model MealLog {
   @@index([foodItemId])
 }
 
+// Coach-authored meal plan for a client's day; the client ticks items off and
+// can attach a photo report per item.
+model MealPlan {
+  id        String   @id @default(cuid())
+  clientId  String
+  coachId   String
+  date      DateTime // the day this plan is for (midnight, client-local)
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items MealPlanItem[]
+
+  @@unique([clientId, date])
+  @@index([clientId, date])
+  @@index([coachId])
+}
+
+model MealPlanItem {
+  id       String   @id @default(cuid())
+  planId   String
+  plan     MealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  mealType MealType
+  order    Int      @default(0)
+  title    String
+  kcal     Int?
+  protein  Int?
+  fat      Int?
+  carbs    Int?
+  // Client tracking:
+  done     Boolean   @default(false)
+  doneAt   DateTime?
+  photoKey String? // S3 object key of the client's photo report
+  createdAt DateTime @default(now())
+
+  @@index([planId])
+}
+
 // ─────────────────────────────────────────────────────────────
 // Progress
 // ─────────────────────────────────────────────────────────────

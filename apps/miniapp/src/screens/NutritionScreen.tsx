@@ -11,6 +11,7 @@ import { LineChart } from '../components/LineChart';
 import { Ring } from '../components/Ring';
 import { OliviaTip, OliviaAvatar } from '../components/Olivia';
 import { OliviaHelp } from '../components/OliviaHelp';
+import { MealPlanCard } from '../components/MealPlanCard';
 import { scanBarcode, haptic } from '../telegram';
 
 const MEAL_LABELS: Record<MealType, string> = {
@@ -184,6 +185,8 @@ export function NutritionScreen({
               </div>
             </div>
           )}
+
+          <MealPlanCard date={date} />
 
           <button
             className="rounded-2xl bg-gradient-to-b from-brand-accentStrong to-brand-accent text-brand-onAccent p-4 font-semibold shadow-[0_8px_24px_-8px_rgba(201,169,106,0.6)] active:scale-[0.99] transition-transform"

@@ -20,6 +20,7 @@ import {
 import type { ChatContext } from '../api';
 import { LineChart } from '../components/LineChart';
 import { StatTile, Chip } from '../components/ui';
+import { CoachMealPlanEditor } from '../components/CoachMealPlanEditor';
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Завтрак',
@@ -680,7 +681,9 @@ function CoachClientNutrition({
   const goal = day?.target;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
+      <CoachMealPlanEditor clientId={clientId} />
+
       <div className="flex items-center justify-between">
         <span className="text-tg-hint text-xs font-medium">Питание (сегодня)</span>
         <div className="flex items-center gap-3">

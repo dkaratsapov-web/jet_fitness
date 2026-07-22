@@ -75,6 +75,29 @@ export interface CoachClientDetail {
   profile: ClientProfile | null;
 }
 
+export interface MealPlanItem {
+  id: string;
+  mealType: MealType;
+  title: string;
+  kcal: number | null;
+  protein: number | null;
+  fat: number | null;
+  carbs: number | null;
+  done: boolean;
+  photoUrl: string | null;
+}
+export interface MealPlan {
+  id: string;
+  date: string;
+  note: string | null;
+  items: MealPlanItem[];
+}
+export interface MealPlanDraftItem {
+  mealType: MealType;
+  title: string;
+  kcal?: number | null;
+}
+
 export interface Invite {
   token: string;
   deepLink: string | null;
@@ -639,6 +662,43 @@ export const api = {
     request<{ ok: boolean }>(`/api/coach/clients/${clientId}/nutrition/meals/${mealId}`, {
       method: 'DELETE',
     }),
+
+  // Meal plan (coach authors, client tracks)
+  coachMealPlan: (clientId: string, date?: string) =>
+    request<{ plan: MealPlan | null }>(
+      `/api/coach/clients/${clientId}/meal-plan${date ? `?date=${date}` : ''}`,
+    ),
+  saveMealPlan: (
+    clientId: string,
+    body: { date?: string; note?: string | null; items: MealPlanDraftItem[] },
+  ) =>
+    request<{ ok: boolean; plan: MealPlan | null }>(`/api/coach/clients/${clientId}/meal-plan`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  clientMealPlan: (date?: string) =>
+    request<{ plan: MealPlan | null }>(`/api/client/meal-plan${date ? `?date=${date}` : ''}`),
+  toggleMealPlanItem: (itemId: string) =>
+    request<{ ok: boolean; done: boolean }>(`/api/client/meal-plan/items/${itemId}/toggle`, {
+      method: 'POST',
+    }),
+  uploadMealPlanPhoto: async (itemId: string, file: File) => {
+    const ext = (file.name.split('.').pop() ?? 'jpg').toLowerCase();
+    const { uploadUrl, fileKey } = await request<{ uploadUrl: string; fileKey: string }>(
+      `/api/client/meal-plan/items/${itemId}/photo/presign`,
+      { method: 'POST', body: JSON.stringify({ ext }) },
+    );
+    const put = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'content-type': file.type || 'application/octet-stream' },
+    });
+    if (!put.ok) throw new Error(`upload failed: ${put.status}`);
+    return request<{ ok: boolean; photoUrl: string | null }>(
+      `/api/client/meal-plan/items/${itemId}/photo`,
+      { method: 'POST', body: JSON.stringify({ fileKey }) },
+    );
+  },
 
   // Challenges (Phase 2)
   coachChallenges: () => request<CoachChallenge[]>('/api/coach/challenges'),

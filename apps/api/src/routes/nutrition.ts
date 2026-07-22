@@ -20,8 +20,48 @@ import {
   type Macros,
 } from '../nutritionSources.js';
 import { searchFatSecret, isFatSecretConfigured } from '../nutrition/fatsecret.js';
+import { presign, isStorageConfigured } from '../storage.js';
+import { notifyUser } from '../notify.js';
+import { randomBytes } from 'node:crypto';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+interface PlanItemInput {
+  mealType: MealType;
+  title: string;
+  kcal?: number | null;
+  protein?: number | null;
+  fat?: number | null;
+  carbs?: number | null;
+}
+
+// Serialize a meal plan (+ items) for the API, resolving photo view URLs.
+function serializePlan(
+  plan: { id: string; date: Date; note: string | null; items: Array<{
+    id: string; mealType: MealType; order: number; title: string;
+    kcal: number | null; protein: number | null; fat: number | null; carbs: number | null;
+    done: boolean; doneAt: Date | null; photoKey: string | null;
+  }> },
+) {
+  return {
+    id: plan.id,
+    date: plan.date.toISOString().slice(0, 10),
+    note: plan.note,
+    items: [...plan.items]
+      .sort((a, b) => MEAL_TYPES.indexOf(a.mealType) - MEAL_TYPES.indexOf(b.mealType) || a.order - b.order)
+      .map((it) => ({
+        id: it.id,
+        mealType: it.mealType,
+        title: it.title,
+        kcal: it.kcal,
+        protein: it.protein,
+        fat: it.fat,
+        carbs: it.carbs,
+        done: it.done,
+        photoUrl: it.photoKey && isStorageConfigured() ? presign('GET', it.photoKey, 3600) : null,
+      })),
+  };
+}
 
 // Day bounds [start, end) for a YYYY-MM-DD string (server-local / UTC).
 function dayRange(dateStr?: string): { start: Date; end: Date } {
@@ -589,6 +629,169 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
       }
       await prisma.mealLog.delete({ where: { id: request.params.mealId } });
       return { ok: true };
+    },
+  );
+
+  // ── Meal plan (coach authors, client tracks) ──────────────────────
+
+  async function coachOwnsClient(coachId: string, clientId: string): Promise<boolean> {
+    const link = await prisma.coachClient.findUnique({
+      where: { coachId_clientId: { coachId, clientId } },
+      select: { status: true },
+    });
+    return Boolean(link);
+  }
+
+  // Coach: read a client's plan for a day.
+  fastify.get<{ Params: { id: string }; Querystring: { date?: string } }>(
+    '/coach/clients/:id/meal-plan',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireCoach(request, reply))) return;
+      if (!(await coachOwnsClient(request.auth!.userId, request.params.id))) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const { start } = dayRange(request.query.date);
+      const plan = await prisma.mealPlan.findUnique({
+        where: { clientId_date: { clientId: request.params.id, date: start } },
+        include: { items: true },
+      });
+      return { plan: plan ? serializePlan(plan) : null };
+    },
+  );
+
+  // Coach: upsert a client's plan for a day (replaces items, resets tracking).
+  fastify.put<{
+    Params: { id: string };
+    Body: { date?: string; note?: string | null; items?: PlanItemInput[] };
+  }>('/coach/clients/:id/meal-plan', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    if (!(await requireCoach(request, reply))) return;
+    const coachId = request.auth!.userId;
+    if (!(await coachOwnsClient(coachId, request.params.id))) {
+      reply.code(404).send({ error: 'not_found' });
+      return;
+    }
+    const body = request.body ?? {};
+    const items = (body.items ?? []).filter((it) => it?.title?.trim() && MEAL_TYPES.includes(it.mealType));
+    const { start } = dayRange(body.date);
+    const num = (v: unknown) => (v != null && Number.isFinite(Number(v)) ? Math.round(Number(v)) : null);
+
+    const plan = await prisma.mealPlan.upsert({
+      where: { clientId_date: { clientId: request.params.id, date: start } },
+      create: { clientId: request.params.id, coachId, date: start, note: body.note?.trim() || null },
+      update: { note: body.note?.trim() || null },
+      select: { id: true },
+    });
+    await prisma.mealPlanItem.deleteMany({ where: { planId: plan.id } });
+    if (items.length) {
+      await prisma.mealPlanItem.createMany({
+        data: items.map((it, i) => ({
+          planId: plan.id,
+          mealType: it.mealType,
+          order: i,
+          title: it.title.trim(),
+          kcal: num(it.kcal),
+          protein: num(it.protein),
+          fat: num(it.fat),
+          carbs: num(it.carbs),
+        })),
+      });
+    }
+    await notifyUser(
+      request.params.id,
+      `🍽 Тренер составил план питания на ${start.toISOString().slice(0, 10)}`,
+      { type: 'nutrition' },
+    );
+    const full = await prisma.mealPlan.findUnique({ where: { id: plan.id }, include: { items: true } });
+    return { ok: true, plan: full ? serializePlan(full) : null };
+  });
+
+  // Client: read own plan for a day.
+  fastify.get<{ Querystring: { date?: string } }>(
+    '/client/meal-plan',
+    { preHandler: fastify.requireAuth },
+    async (request) => {
+      const { start } = dayRange(request.query.date);
+      const plan = await prisma.mealPlan.findUnique({
+        where: { clientId_date: { clientId: request.auth!.userId, date: start } },
+        include: { items: true },
+      });
+      return { plan: plan ? serializePlan(plan) : null };
+    },
+  );
+
+  // Client owns a plan item?
+  async function itemOwnedBy(itemId: string, clientId: string) {
+    const item = await prisma.mealPlanItem.findUnique({
+      where: { id: itemId },
+      include: { plan: { select: { clientId: true } } },
+    });
+    return item && item.plan.clientId === clientId ? item : null;
+  }
+
+  // Client: tick an item done / undone.
+  fastify.post<{ Params: { itemId: string } }>(
+    '/client/meal-plan/items/:itemId/toggle',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      const item = await itemOwnedBy(request.params.itemId, request.auth!.userId);
+      if (!item) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const done = !item.done;
+      await prisma.mealPlanItem.update({
+        where: { id: item.id },
+        data: { done, doneAt: done ? new Date() : null },
+      });
+      return { ok: true, done };
+    },
+  );
+
+  // Client: presign a photo-report upload for an item.
+  fastify.post<{ Params: { itemId: string }; Body: { ext?: string } }>(
+    '/client/meal-plan/items/:itemId/photo/presign',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      const userId = request.auth!.userId;
+      const item = await itemOwnedBy(request.params.itemId, userId);
+      if (!item) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      if (!isStorageConfigured()) {
+        reply.code(503).send({ error: 'storage_unconfigured' });
+        return;
+      }
+      const ext = (request.body?.ext ?? 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      const fileKey = `mealplan/${userId}/${request.params.itemId}-${Date.now()}-${randomBytes(4).toString('hex')}.${ext}`;
+      const uploadUrl = presign('PUT', fileKey, 900);
+      return { uploadUrl, fileKey };
+    },
+  );
+
+  // Client: confirm the uploaded photo report.
+  fastify.post<{ Params: { itemId: string }; Body: { fileKey?: string } }>(
+    '/client/meal-plan/items/:itemId/photo',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      const userId = request.auth!.userId;
+      const item = await itemOwnedBy(request.params.itemId, userId);
+      if (!item) {
+        reply.code(404).send({ error: 'not_found' });
+        return;
+      }
+      const fileKey = request.body?.fileKey;
+      if (!fileKey || !fileKey.startsWith(`mealplan/${userId}/`)) {
+        reply.code(400).send({ error: 'bad_request', reason: 'invalid_key' });
+        return;
+      }
+      await prisma.mealPlanItem.update({
+        where: { id: item.id },
+        data: { photoKey: fileKey, done: true, doneAt: item.doneAt ?? new Date() },
+      });
+      return { ok: true, photoUrl: isStorageConfigured() ? presign('GET', fileKey, 3600) : null };
     },
   );
 };
