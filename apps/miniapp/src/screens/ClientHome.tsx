@@ -26,7 +26,17 @@ import { ExerciseDetail } from '../components/ExerciseDetail';
 import { ChatScreen } from '../components/ChatScreen';
 import { BottomNav, type ClientTab } from '../components/BottomNav';
 import { RoleSwitch } from '../components/RoleSwitch';
+import { LiveDot, Sparkline } from '../components/ui';
 import type { NutritionDay, ProgressEntry, ChatContext } from '../api';
+
+// Time-of-day greeting (client is in the user's local tz).
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 6) return 'Доброй ночи';
+  if (h < 12) return 'Доброе утро';
+  if (h < 18) return 'Добрый день';
+  return 'Добрый вечер';
+}
 
 type Overlay =
   | 'chat'
@@ -241,9 +251,9 @@ function HomeTab({
       <header className="jf-rise flex items-start justify-between">
         <div>
           <p className="jf-shimmer text-[11px] font-bold uppercase tracking-[0.22em]">
-            Личный кабинет
+            {greeting()}
           </p>
-          <h1 className="text-2xl font-semibold mt-0.5">Привет, {name}!</h1>
+          <h1 className="text-2xl font-bold mt-0.5">{name}</h1>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -269,11 +279,11 @@ function HomeTab({
       {needsOnboarding && <OnboardingForm onDone={onOnboarded} />}
 
       <div className="jf-rise jf-rise-1">
-        <Hero program={program} onStart={onStart} />
+        <Hero program={program} history={history} onStart={onStart} />
       </div>
 
       <div className="jf-rise jf-rise-2">
-        <StatCards nutri={nutri} progress={progress} onTab={onTab} />
+        <StatCards nutri={nutri} progress={progress} history={history} onTab={onTab} />
       </div>
 
       <button
@@ -310,12 +320,61 @@ function HomeTab({
   );
 }
 
+// Monday-based current-week activity strip: filled gold = trained, pulsing aqua
+// ring = today (not yet trained), muted = rest/empty.
+function WeekStrip({ history }: { history: WorkoutSummary[] }) {
+  const today = new Date();
+  const dow = (today.getDay() + 6) % 7; // 0 = Monday
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - dow);
+  monday.setHours(0, 0, 0, 0);
+  const done = new Set(history.map((w) => new Date(w.date).toDateString()));
+  const labels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const days = labels.map((label, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return {
+      label,
+      done: done.has(d.toDateString()),
+      isToday: d.toDateString() === today.toDateString(),
+    };
+  });
+  return (
+    <div className="flex items-center justify-between gap-1 pt-1">
+      {days.map((d, i) => (
+        <div key={i} className="flex flex-col items-center gap-1.5">
+          <span
+            className="w-6 h-6 rounded-full grid place-items-center text-[10px] font-bold"
+            style={
+              d.done
+                ? { background: 'linear-gradient(180deg,var(--accent-strong),var(--accent))', color: 'var(--on-accent)' }
+                : d.isToday
+                  ? { border: '2px solid var(--energy)', color: 'var(--energy)' }
+                  : { background: 'var(--surface-2)', color: 'var(--muted)' }
+            }
+          >
+            {d.done ? '✓' : ''}
+          </span>
+          <span
+            className="text-[9px] font-semibold"
+            style={{ color: d.isToday ? 'var(--energy)' : 'var(--muted)' }}
+          >
+            {d.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Hero "workout today" card, or the empty state.
 function Hero({
   program,
+  history,
   onStart,
 }: {
   program: ClientProgram | null | undefined;
+  history: WorkoutSummary[];
   onStart: (day: ClientProgramDay, index: number) => void;
 }) {
   if (program === undefined) {
@@ -323,17 +382,20 @@ function Hero({
   }
   if (!program || program.days.length === 0) {
     return (
-      <div className="jf-card p-4 flex gap-3 items-start">
-        <span className="w-10 h-10 rounded-xl bg-brand-surface2 brand-line grid place-items-center text-xl shrink-0">
-          🏋️
-        </span>
-        <div>
-          <div className="font-semibold mb-0.5">Программы пока нет</div>
-          <p className="text-brand-muted text-xs leading-relaxed">
-            Как только тренер выдаст программу, она появится здесь — с днями,
-            упражнениями и подходами.
-          </p>
+      <div className="jf-card p-4 flex flex-col gap-3">
+        <div className="flex gap-3 items-start">
+          <span className="w-10 h-10 rounded-xl bg-brand-surface2 brand-line grid place-items-center text-xl shrink-0">
+            🏋️
+          </span>
+          <div>
+            <div className="font-semibold mb-0.5">Программы пока нет</div>
+            <p className="text-brand-muted text-xs leading-relaxed">
+              Как только тренер выдаст программу, она появится здесь — с днями,
+              упражнениями и подходами.
+            </p>
+          </div>
         </div>
+        <WeekStrip history={history} />
       </div>
     );
   }
@@ -343,14 +405,17 @@ function Hero({
     .join(' · ');
   return (
     <div
-      className="jf-card p-4 flex flex-col gap-3"
+      className="jf-card p-4 flex flex-col gap-3.5"
       style={{
         background:
           'radial-gradient(120% 120% at 100% 0%, rgba(201,169,106,0.12), transparent 55%), linear-gradient(180deg, rgba(255,255,255,0.03), transparent 44%), var(--surface)',
       }}
     >
-      <div className="text-brand-accent text-[11px] font-bold uppercase tracking-[0.16em]">
-        Тренировка на сегодня
+      <div className="flex items-center gap-2">
+        <LiveDot />
+        <span className="text-brand-energy text-[11px] font-bold uppercase tracking-[0.16em]">
+          Тренировка на сегодня
+        </span>
       </div>
       <div>
         <h2 className="text-xl font-bold">{day.title || 'День 1'}</h2>
@@ -359,23 +424,26 @@ function Hero({
         </div>
       </div>
       <button
-        className="rounded-2xl bg-gradient-to-b from-brand-accentStrong to-brand-accent text-brand-onAccent p-3.5 font-semibold shadow-[0_8px_24px_-8px_rgba(201,169,106,0.6)] active:scale-[0.99] transition-transform"
+        className="rounded-2xl bg-gradient-to-b from-brand-accentStrong to-brand-accent text-brand-onAccent p-3.5 font-semibold shadow-[0_8px_24px_-8px_rgba(201,169,106,0.6)] jf-press"
         onClick={() => onStart(day, 0)}
       >
         ▶ Начать тренировку
       </button>
+      <WeekStrip history={history} />
     </div>
   );
 }
 
-// Nutrition + weight summary cards.
+// Calories · weight · activity summary tiles.
 function StatCards({
   nutri,
   progress,
+  history,
   onTab,
 }: {
   nutri: NutritionDay | null;
   progress: ProgressEntry[];
+  history: WorkoutSummary[];
   onTab: (t: ClientTab) => void;
 }) {
   const kcal = nutri?.totals.kcal ?? 0;
@@ -385,71 +453,73 @@ function StatCards({
   const prev = weights[1]?.weightKg ?? null;
   const delta = latest != null && prev != null ? +(latest - prev).toFixed(1) : null;
 
+  // Workouts in the current Monday-based week.
+  const today = new Date();
+  const dow = (today.getDay() + 6) % 7;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - dow);
+  monday.setHours(0, 0, 0, 0);
+  const weekWorkouts = history.filter((w) => new Date(w.date) >= monday).length;
+
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <button className="jf-card p-3.5 flex flex-col gap-2 text-left" onClick={() => onTab('nutrition')}>
-        <div className="text-brand-muted text-[10px] font-bold uppercase tracking-wide">Питание</div>
-        <div className="flex items-center gap-3">
-          <Ring value={kcal} goal={goal} size={44} stroke={6}>
-            <span className="text-[10px] font-bold tabular leading-none">{kcal}</span>
+    <div className="grid grid-cols-3 gap-3">
+      {/* Calories — ring tile */}
+      <button className="jf-tile p-3 flex flex-col gap-2 text-left" onClick={() => onTab('nutrition')}>
+        <div className="jf-eyebrow" style={{ color: 'var(--muted)' }}>Калории</div>
+        <div className="flex items-center gap-2">
+          <Ring value={kcal} goal={goal} size={38} stroke={5}>
+            <span className="text-[9px] font-bold tabular leading-none">{kcal}</span>
           </Ring>
-          <div>
-            <div className="text-lg font-bold tabular leading-none">
-              {kcal}
-              {goal ? <span className="text-brand-muted text-xs font-normal"> / {goal}</span> : ''}
+          <div className="min-w-0">
+            <div className="text-[11px] text-brand-muted leading-tight">
+              {goal ? `из ${goal}` : 'цель —'}
             </div>
-            <div className="text-brand-muted text-[10px] mt-1">
-              {goal ? `осталось ${Math.max(0, goal - kcal)}` : 'цель задаёт тренер'}
-            </div>
+            {goal && (
+              <div className="text-[11px] font-semibold text-brand-energy leading-tight mt-0.5">
+                −{Math.max(0, goal - kcal)}
+              </div>
+            )}
           </div>
         </div>
       </button>
 
-      <button className="jf-card p-3.5 flex flex-col gap-2 text-left" onClick={() => onTab('health')}>
-        <div className="text-brand-muted text-[10px] font-bold uppercase tracking-wide">Вес</div>
+      {/* Weight — value + spark */}
+      <button className="jf-tile p-3 flex flex-col gap-1.5 text-left" onClick={() => onTab('health')}>
+        <div className="jf-eyebrow" style={{ color: 'var(--muted)' }}>Вес</div>
         {latest != null ? (
           <>
-            <div className="text-2xl font-bold tabular leading-none">
-              {latest}
-              <span className="text-brand-muted text-xs font-normal"> кг</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-extrabold tabular leading-none text-brand-accentStrong">{latest}</span>
+              <span className="text-[10px] text-brand-muted">кг</span>
               {delta != null && delta !== 0 && (
-                <span
-                  className="text-xs ml-1.5"
-                  style={{ color: delta < 0 ? 'var(--pos)' : 'var(--neg)' }}
-                >
-                  {delta > 0 ? '+' : ''}
-                  {delta}
+                <span className="text-[10px] font-semibold ml-0.5" style={{ color: delta < 0 ? 'var(--pos)' : 'var(--neg)' }}>
+                  {delta > 0 ? '+' : ''}{delta}
                 </span>
               )}
             </div>
-            {weights.length >= 2 && (
-              <MiniSpark values={[...weights].reverse().map((w) => w.weightKg as number)} />
+            {weights.length >= 2 ? (
+              <Sparkline values={[...weights].reverse().map((w) => w.weightKg as number)} width={72} height={22} />
+            ) : (
+              <div className="text-[10px] text-brand-muted">нужен ещё замер</div>
             )}
           </>
         ) : (
-          <div className="text-brand-muted text-xs">добавь замер</div>
+          <div className="text-[11px] text-brand-muted mt-1">добавь замер</div>
         )}
       </button>
-    </div>
-  );
-}
 
-function MiniSpark({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const pts = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * 100;
-      const y = 24 - ((v - min) / span) * 20 - 2;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-  return (
-    <svg viewBox="0 0 100 26" preserveAspectRatio="none" className="w-full h-6">
-      <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" />
-    </svg>
+      {/* Activity — workouts this week */}
+      <button className="jf-tile p-3 flex flex-col gap-1.5 text-left" onClick={() => onTab('health')}>
+        <div className="jf-eyebrow" style={{ color: 'var(--muted)' }}>За неделю</div>
+        <div className="flex items-baseline gap-1">
+          <span className="text-xl font-extrabold tabular leading-none text-brand-energy">{weekWorkouts}</span>
+          <span className="text-[10px] text-brand-muted">трен.</span>
+        </div>
+        <div className="text-[10px] text-brand-muted leading-tight">
+          {weekWorkouts === 0 ? 'начни неделю' : weekWorkouts >= 4 ? 'отличный темп 🔥' : 'так держать'}
+        </div>
+      </button>
+    </div>
   );
 }
 
