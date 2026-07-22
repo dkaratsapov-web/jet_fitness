@@ -24,9 +24,16 @@ export function ExerciseLibrary({
   }
   useEffect(load, []);
 
-  const filtered = (items ?? []).filter((e) =>
-    query.trim() ? e.name.toLowerCase().includes(query.trim().toLowerCase()) : true,
-  );
+  // Fuzzy-ish search: normalize ё→е, match every query word against the name +
+  // muscle group (so "жим плечи" finds "Жим гантелей сидя · Плечи", and "лежа"
+  // matches "лёжа"). No exact-substring requirement.
+  const norm = (s: string) => s.toLowerCase().replace(/ё/g, 'е');
+  const tokens = norm(query).split(/\s+/).filter(Boolean);
+  const filtered = (items ?? []).filter((e) => {
+    if (!tokens.length) return true;
+    const hay = norm(`${e.name} ${e.muscleGroup ?? ''}`);
+    return tokens.every((t) => hay.includes(t));
+  });
   // Group by muscle group, preserving the server's sort.
   const groups = new Map<string, ExerciseLite[]>();
   for (const e of filtered) {
