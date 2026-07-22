@@ -6,6 +6,7 @@ import {
   type OwnerStats,
   type OwnerCoach,
   type OwnerClientRow,
+  type CoachOnboardInvite,
   type FatSecretDiagnostics,
 } from '../api';
 import { RoleSwitch } from '../components/RoleSwitch';
@@ -220,7 +221,8 @@ function Coaches() {
   useEffect(load, []);
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
+      <CoachInvitePanel />
       {items === null ? (
         <p className="text-tg-hint text-sm">Загрузка…</p>
       ) : items.length === 0 ? (
@@ -236,6 +238,89 @@ function Coaches() {
             onChanged={load}
           />
         ))
+      )}
+    </div>
+  );
+}
+
+// Owner issues one-time coach-onboarding invite links.
+function CoachInvitePanel() {
+  const [invites, setInvites] = useState<CoachOnboardInvite[] | null>(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  function load() {
+    api.ownerCoachInvites().then(setInvites).catch(() => setInvites([]));
+  }
+  useEffect(load, []);
+
+  async function create() {
+    setBusy(true);
+    try {
+      await api.createCoachInvite(note.trim() || undefined);
+      setNote('');
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copy(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(link);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="jf-card p-3 flex flex-col gap-2">
+      <div className="font-semibold text-sm">Пригласить тренера</div>
+      <p className="text-brand-muted text-xs">
+        Одноразовая ссылка. Кто откроет — станет тренером на платформе.
+      </p>
+      <div className="flex gap-2">
+        <input
+          className="flex-1 rounded-xl bg-tg-secondaryBg p-2.5 text-sm outline-none"
+          placeholder="Имя/заметка (необязательно)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+        <button
+          className="rounded-xl bg-brand-accent text-brand-onAccent px-4 text-sm font-semibold disabled:opacity-60"
+          onClick={create}
+          disabled={busy}
+        >
+          {busy ? '…' : '+ Ссылка'}
+        </button>
+      </div>
+
+      {invites && invites.length > 0 && (
+        <ul className="flex flex-col gap-1.5 mt-1">
+          {invites.slice(0, 8).map((i) => (
+            <li key={i.id} className="rounded-xl bg-tg-secondaryBg p-2.5 flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-medium truncate">
+                  {i.note || 'Приглашение тренера'}
+                </div>
+                <div className="text-brand-muted text-[11px]">
+                  {i.used ? `✓ принял: ${i.usedBy ?? 'тренер'}` : 'ожидает'}
+                </div>
+              </div>
+              {!i.used && (
+                <button
+                  className="rounded-lg bg-tg-bg px-3 py-1.5 text-xs text-brand-accent font-medium shrink-0"
+                  onClick={() => copy(i.deepLink)}
+                >
+                  {copied === i.deepLink ? 'Скопировано' : 'Копировать'}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

@@ -49,10 +49,13 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply): Promise<SessionResponse> => {
       const auth = request.auth!;
 
-      // If launched via an invite deep-link, bind this user to the coach.
+      // If launched via a deep-link, bind: coach→client invite, or an
+      // owner-issued coach-onboarding invite (grants the coach role).
       const start = parseStartParam(auth.initData.startParam);
       if (start?.kind === 'invite') {
         await bindInvite(auth.userId, start.token, fastify.log);
+      } else if (start?.kind === 'coach_invite') {
+        await bindCoachInvite(auth.userId, start.token, fastify.log);
       }
 
       // Re-read the user (invite binding may have created a client relationship).
@@ -127,6 +130,42 @@ async function bindInvite(
   });
   const who = client?.firstName || (client?.username ? `@${client.username}` : 'Новый клиент');
   await notifyUser(invite.coachId, `🎉 ${who} присоединился(ась) к вам по приглашению.`, { type: 'client_joined' });
+}
+
+/** Consume an owner-issued coach invite: grant the coach role to this user. */
+async function bindCoachInvite(
+  userId: string,
+  token: string,
+  log: { warn: (msg: string) => void },
+): Promise<void> {
+  const invite = await prisma.coachOnboardInvite.findUnique({ where: { token } });
+  if (!invite) return log.warn(`coach invite not found: ${token}`);
+  if (invite.usedAt) return log.warn(`coach invite already used: ${token}`);
+  if (invite.expiresAt < new Date()) return log.warn(`coach invite expired: ${token}`);
+
+  await prisma.$transaction([
+    prisma.coachOnboardInvite.update({
+      where: { id: invite.id },
+      data: { usedAt: new Date(), usedById: userId },
+    }),
+    prisma.coachProfile.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    }),
+  ]);
+
+  // Tell the owner their invite was accepted.
+  const [newCoach, owner] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { firstName: true, username: true } }),
+    prisma.user.findUnique({ where: { id: invite.createdBy }, select: { id: true } }),
+  ]);
+  const who = newCoach?.firstName || (newCoach?.username ? `@${newCoach.username}` : 'Новый тренер');
+  if (owner) {
+    await notifyUser(owner.id, `🎓 ${who} принял(а) приглашение и стал(а) тренером.`, {
+      type: 'client_joined',
+    });
+  }
 }
 
 async function resolveUserAndRoles(userId: string) {

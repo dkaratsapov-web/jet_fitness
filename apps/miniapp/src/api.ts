@@ -479,6 +479,16 @@ export interface OwnerCoach {
   revenue: number;
 }
 
+export interface CoachOnboardInvite {
+  id: string;
+  note: string | null;
+  deepLink: string;
+  expiresAt: string;
+  used: boolean;
+  usedBy: string | null;
+  createdAt: string;
+}
+
 export interface OwnerClientRow {
   id: string;
   name: string;
@@ -901,6 +911,12 @@ export const api = {
     request<{ fatsecret: FatSecretDiagnostics }>('/api/owner/diagnostics'),
   ownerCoaches: () => request<OwnerCoach[]>('/api/owner/coaches'),
   ownerClients: () => request<OwnerClientRow[]>('/api/owner/clients'),
+  ownerCoachInvites: () => request<CoachOnboardInvite[]>('/api/owner/coach-invites'),
+  createCoachInvite: (note?: string) =>
+    request<{ token: string; deepLink: string; expiresAt: string }>('/api/owner/coach-invites', {
+      method: 'POST',
+      body: JSON.stringify(note ? { note } : {}),
+    }),
   suspendUser: (id: string, suspended: boolean) =>
     request<{ ok: boolean; suspended: boolean }>(`/api/owner/users/${id}/suspend`, {
       method: 'POST',

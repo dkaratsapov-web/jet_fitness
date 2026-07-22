@@ -25,15 +25,24 @@ export interface SessionResponse {
   isClient: boolean;
 }
 
-/** Parse a deep-link start param, e.g. "invite_ab12cd" => { kind, token }. */
+/**
+ * Parse a deep-link start param.
+ *   "invite_ab12cd" => coach→client invite
+ *   "coach_ab12cd"  => owner→coach onboarding invite
+ */
 export function parseStartParam(
   startParam: string | undefined | null,
-): { kind: 'invite'; token: string } | null {
+): { kind: 'invite' | 'coach_invite'; token: string } | null {
   if (!startParam) return null;
   const invitePrefix = 'invite_';
   if (startParam.startsWith(invitePrefix)) {
     const token = startParam.slice(invitePrefix.length);
     if (token) return { kind: 'invite', token };
+  }
+  const coachPrefix = 'coach_';
+  if (startParam.startsWith(coachPrefix)) {
+    const token = startParam.slice(coachPrefix.length);
+    if (token) return { kind: 'coach_invite', token };
   }
   return null;
 }

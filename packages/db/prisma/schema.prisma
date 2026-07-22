@@ -185,6 +185,20 @@ model CoachInvite {
   @@index([coachId])
 }
 
+// Owner-issued one-time invite that onboards a user as a coach.
+model CoachOnboardInvite {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  createdBy String // owner User id
+  note      String? // optional label, e.g. the coach's name
+  expiresAt DateTime
+  usedAt    DateTime?
+  usedById  String?
+  createdAt DateTime  @default(now())
+
+  @@index([createdBy])
+}
+
 // ─────────────────────────────────────────────────────────────
 // Training: exercises, programs, assignments, logs
 // ─────────────────────────────────────────────────────────────

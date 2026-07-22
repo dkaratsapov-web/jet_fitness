@@ -5,6 +5,7 @@
 //   GET  /owner/clients               — all clients
 //   POST /owner/users/:id/suspend     — suspend / unsuspend a user (moderation)
 
+import { randomBytes } from 'node:crypto';
 import type { FastifyPluginAsync } from 'fastify';
 import { prisma } from '@jet/db';
 import { requireOwner } from '../auth/guards.js';
@@ -15,11 +16,60 @@ import { fatSecretDiagnostics } from '../nutrition/fatsecret.js';
 const nameOfUser = (u: { firstName: string | null; username: string | null }) =>
   u.firstName || (u.username ? `@${u.username}` : 'Пользователь');
 
+const COACH_INVITE_TTL_DAYS = 14;
+
 export const ownerRoutes: FastifyPluginAsync = async (fastify) => {
   // ── Integrations diagnostics (FatSecret) ────────────────────────
   fastify.get('/owner/diagnostics', { preHandler: fastify.requireAuth }, async (request, reply) => {
     if (!(await requireOwner(request, reply))) return;
     return { fatsecret: await fatSecretDiagnostics() };
+  });
+
+  // ── Coach onboarding invites ────────────────────────────────────
+  // Owner issues a one-time deep-link; opening it grants the coach role.
+  fastify.post<{ Body: { note?: string } }>(
+    '/owner/coach-invites',
+    { preHandler: fastify.requireAuth },
+    async (request, reply) => {
+      if (!(await requireOwner(request, reply))) return;
+      const auth = request.auth!;
+      const token = randomBytes(16).toString('base64url');
+      const expiresAt = new Date(Date.now() + COACH_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
+      await prisma.coachOnboardInvite.create({
+        data: { token, createdBy: auth.userId, note: request.body?.note?.trim() || null, expiresAt },
+      });
+      const deepLink = env.botUsername
+        ? `https://t.me/${env.botUsername}?start=coach_${token}`
+        : `?start=coach_${token}`;
+      return { token, deepLink, expiresAt };
+    },
+  );
+
+  fastify.get('/owner/coach-invites', { preHandler: fastify.requireAuth }, async (request, reply) => {
+    if (!(await requireOwner(request, reply))) return;
+    const invites = await prisma.coachOnboardInvite.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+    const usedIds = invites.map((i) => i.usedById).filter((v): v is string => Boolean(v));
+    const users = usedIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: usedIds } },
+          select: { id: true, firstName: true, username: true },
+        })
+      : [];
+    const nameOf = new Map(users.map((u) => [u.id, nameOfUser(u)]));
+    return invites.map((i) => ({
+      id: i.id,
+      note: i.note,
+      deepLink: env.botUsername
+        ? `https://t.me/${env.botUsername}?start=coach_${i.token}`
+        : `?start=coach_${i.token}`,
+      expiresAt: i.expiresAt,
+      used: i.usedAt != null,
+      usedBy: i.usedById ? (nameOf.get(i.usedById) ?? 'Тренер') : null,
+      createdAt: i.createdAt,
+    }));
   });
 
   // ── Platform stats ──────────────────────────────────────────────
