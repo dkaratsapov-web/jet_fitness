@@ -15,10 +15,21 @@ type State =
   | { phase: 'error'; message: string }
   | { phase: 'ready'; session: SessionResponse };
 
+// Minimum time the Olivia splash stays up, so the branded moment actually
+// plays even when the session loads in milliseconds. Shown to everyone on open,
+// regardless of role.
+const SPLASH_MIN_MS = 2800;
+
 export function App() {
   const [state, setState] = useState<State>({ phase: 'loading' });
   const [activeRole, setActiveRole] = useState<AppRole | null>(null);
   const [busy, setBusy] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setSplashDone(true), SPLASH_MIN_MS);
+    return () => clearTimeout(t);
+  }, []);
 
   function loadSession(autoSelect = true) {
     return api
@@ -84,7 +95,9 @@ export function App() {
     }
   }
 
-  if (state.phase === 'loading') {
+  // Olivia splash: shown to everyone on open, until the session is ready AND the
+  // minimum splash time has elapsed.
+  if (state.phase === 'loading' || !splashDone) {
     return <Preloader />;
   }
 
