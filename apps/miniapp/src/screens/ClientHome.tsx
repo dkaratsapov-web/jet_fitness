@@ -29,6 +29,7 @@ import { RoleSwitch } from '../components/RoleSwitch';
 import { LiveDot, Sparkline } from '../components/ui';
 import { OliviaTip, OliviaAvatar, OliviaFab } from '../components/Olivia';
 import { OliviaHelp } from '../components/OliviaHelp';
+import { Icon, type IconName } from '../components/Icon';
 
 // Which Olivia help branch matches each client tab (for the floating assistant).
 const TAB_BRANCH: Record<ClientTab, string> = {
@@ -327,8 +328,8 @@ function HomeTab({
         className="jf-rise jf-rise-3 jf-card p-4 flex items-center gap-3 text-left"
         onClick={() => openChat(null)}
       >
-        <span className="w-11 h-11 rounded-2xl shrink-0 grid place-items-center text-xl bg-gradient-to-b from-brand-accentStrong to-brand-accent text-brand-onAccent shadow-[0_6px_18px_-6px_rgba(201,169,106,0.7)]">
-          💬
+        <span className="w-11 h-11 rounded-2xl shrink-0 grid place-items-center bg-gradient-to-b from-brand-accentStrong to-brand-accent text-brand-onAccent shadow-[0_6px_18px_-6px_rgba(201,169,106,0.7)]">
+          <Icon name="chat" size={22} />
         </span>
         <span className="flex-1">
           <span className="block font-semibold">Чат с тренером</span>
@@ -342,9 +343,9 @@ function HomeTab({
       </button>
 
       <div className="jf-rise jf-rise-4 grid grid-cols-3 gap-3">
-        <Chip icon="🏋️" name="Тренировка" sub="своя · активность" onClick={onActivity} />
-        <Chip icon="📚" name="Библиотека" sub="упражнения" onClick={onLibrary} />
-        <Chip icon="🎬" name="Техника" sub="видео-разбор" onClick={onTechnique} />
+        <Chip icon="dumbbell" name="Тренировка" sub="своя · активность" onClick={onActivity} />
+        <Chip icon="book" name="Библиотека" sub="упражнения" onClick={onLibrary} />
+        <Chip icon="video" name="Техника" sub="видео-разбор" onClick={onTechnique} />
       </div>
 
       {program && program.days.length > 0 && (
@@ -577,14 +578,16 @@ function Chip({
   sub,
   onClick,
 }: {
-  icon: string;
+  icon: IconName;
   name: string;
   sub: string;
   onClick: () => void;
 }) {
   return (
-    <button className="jf-card p-3 flex flex-col gap-1.5 text-center items-center active:scale-[0.98] transition-transform" onClick={onClick}>
-      <span className="text-lg">{icon}</span>
+    <button className="jf-card p-3 flex flex-col gap-1.5 text-center items-center jf-press" onClick={onClick}>
+      <span className="w-9 h-9 rounded-xl grid place-items-center bg-brand-surface2 brand-line text-brand-accent">
+        <Icon name={icon} size={20} />
+      </span>
       <span className="text-xs font-bold">{name}</span>
       <span className="text-brand-muted text-[9.5px]">{sub}</span>
     </button>
@@ -669,21 +672,21 @@ function HealthTab({
       </header>
 
       <HealthRow
-        icon="📊"
+        icon="body"
         name="Показатели тела"
         sub="вес · замеры · фото прогресса"
         onClick={onProgress}
       />
       <HealthRow
-        icon="⌚"
+        icon="watch"
         name="Фитнес-браслет"
         sub="шаги · пульс · сон · калории"
         onClick={onWearable}
       />
       {healthEnabled ? (
         <>
-          <HealthRow icon="🧪" name="Анализы" sub="динамика · нормы · распознавание" onClick={onLabs} />
-          <HealthRow icon="💊" name="Бады и добавки" sub="приём · расписание · напоминания" onClick={onSupplements} />
+          <HealthRow icon="flask" name="Анализы" sub="динамика · нормы · распознавание" onClick={onLabs} />
+          <HealthRow icon="pill" name="Бады и добавки" sub="приём · расписание · напоминания" onClick={onSupplements} />
         </>
       ) : (
         <p className="text-brand-muted text-sm">
@@ -700,15 +703,15 @@ function HealthRow({
   sub,
   onClick,
 }: {
-  icon: string;
+  icon: IconName;
   name: string;
   sub: string;
   onClick: () => void;
 }) {
   return (
-    <button className="jf-card p-4 flex items-center gap-3 text-left active:scale-[0.99] transition-transform" onClick={onClick}>
-      <span className="w-11 h-11 rounded-2xl shrink-0 grid place-items-center text-xl bg-brand-surface2 brand-line">
-        {icon}
+    <button className="jf-card p-4 flex items-center gap-3 text-left jf-press" onClick={onClick}>
+      <span className="w-11 h-11 rounded-2xl shrink-0 grid place-items-center bg-brand-surface2 brand-line text-brand-accent">
+        <Icon name={icon} size={22} />
       </span>
       <span className="flex-1 min-w-0">
         <span className="block font-semibold">{name}</span>
@@ -748,10 +751,10 @@ function ProfileTab({
       </header>
 
       <div className="grid grid-cols-2 gap-3">
-        <Chip icon="🏋️" name="Тренировки" sub="свои · активность" onClick={onActivity} />
-        <Chip icon="📚" name="Библиотека" sub="упражнения" onClick={onLibrary} />
-        <Chip icon="📝" name="Check-in" sub="самочувствие" onClick={onCheckin} />
-        <Chip icon="🎬" name="Техника" sub="видео-разбор" onClick={onTechnique} />
+        <Chip icon="dumbbell" name="Тренировки" sub="свои · активность" onClick={onActivity} />
+        <Chip icon="book" name="Библиотека" sub="упражнения" onClick={onLibrary} />
+        <Chip icon="checkin" name="Check-in" sub="самочувствие" onClick={onCheckin} />
+        <Chip icon="video" name="Техника" sub="видео-разбор" onClick={onTechnique} />
       </div>
 
       {challenges.length > 0 && <Challenges items={challenges} />}
