@@ -66,6 +66,15 @@ export interface CoachClient {
   goal: string | null;
 }
 
+export interface CoachClientDetail {
+  id: string;
+  firstName: string | null;
+  username: string | null;
+  status: CoachClient['status'];
+  startedAt: string | null;
+  profile: ClientProfile | null;
+}
+
 export interface Invite {
   token: string;
   deepLink: string | null;
@@ -542,6 +551,7 @@ export const api = {
   registerCoach: () =>
     request<{ ok: boolean }>('/api/coach/register', { method: 'POST' }),
   coachClients: () => request<CoachClient[]>('/api/coach/clients'),
+  coachClient: (id: string) => request<CoachClientDetail>(`/api/coach/clients/${id}`),
   coachDashboard: () => request<CoachDashboard>('/api/coach/dashboard'),
   coachOverview: () => request<CoachOverview>('/api/coach/overview'),
   createInvite: () => request<Invite>('/api/coach/invites', { method: 'POST' }),

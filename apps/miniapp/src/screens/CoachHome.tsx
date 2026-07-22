@@ -14,8 +14,12 @@ import {
   type NutritionDay,
   type FoodSearchItem,
   type MealType,
+  type CoachClientDetail,
+  type Sex,
 } from '../api';
 import type { ChatContext } from '../api';
+import { LineChart } from '../components/LineChart';
+import { StatTile, Chip } from '../components/ui';
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Завтрак',
@@ -36,6 +40,26 @@ const STATUS_LABEL: Record<CoachClient['status'], string> = {
   paused: 'на паузе',
   ended: 'завершён',
 };
+
+const SEX_LABEL: Record<Sex, string> = { male: 'М', female: 'Ж', other: '—' };
+
+function ageFrom(birthDate: string | null): number | null {
+  if (!birthDate) return null;
+  const b = new Date(birthDate);
+  if (Number.isNaN(b.getTime())) return null;
+  const now = new Date();
+  let a = now.getFullYear() - b.getFullYear();
+  const m = now.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < b.getDate())) a--;
+  return a >= 0 && a < 130 ? a : null;
+}
+
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+}
 
 type Tab = 'clients' | 'programs' | 'nutrition' | 'payments';
 
@@ -314,6 +338,7 @@ function ClientRow({
 }) {
   const clientName = client.firstName ?? (client.username ? `@${client.username}` : 'Клиент');
   const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<CoachClientDetail | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutSummary[] | null>(null);
   const [progress, setProgress] = useState<ProgressEntry[] | null>(null);
   const [checkins, setCheckins] = useState<Checkin[] | null>(null);
@@ -337,6 +362,7 @@ function ClientRow({
     const next = !open;
     setOpen(next);
     if (next && workouts === null) {
+      api.coachClient(client.id).then(setDetail).catch(() => setDetail(null));
       api
         .coachClientWorkouts(client.id)
         .then(setWorkouts)
@@ -394,19 +420,62 @@ function ClientRow({
       </div>
 
       {open && (
-        <div className="mt-3 border-t border-tg-bg pt-3 flex flex-col gap-3">
-          {latestWeight != null && (
-            <div className="flex items-baseline gap-2">
-              <span className="text-tg-hint text-xs">Вес:</span>
-              <span className="font-semibold">{latestWeight} кг</span>
-              {wDelta != null && wDelta !== 0 && (
-                <span className={`text-xs ${wDelta < 0 ? 'text-green-500' : 'text-red-400'}`}>
-                  {wDelta > 0 ? '+' : ''}
-                  {wDelta}
-                </span>
-              )}
+        <div className="mt-3 border-t border-line pt-3 flex flex-col gap-3">
+          {/* Характеристики */}
+          {(() => {
+            const p = detail?.profile;
+            const age = ageFrom(p?.birthDate ?? null);
+            const days = daysSince(client.startedAt);
+            const chips: string[] = [];
+            if (p?.sex) chips.push(`Пол: ${SEX_LABEL[p.sex]}`);
+            if (p?.heightCm) chips.push(`Рост: ${p.heightCm} см`);
+            if (age != null) chips.push(`${age} лет`);
+            if (days != null) chips.push(`С нами: ${days} дн.`);
+            return (
+              <>
+                {(client.goal || p?.goal) && (
+                  <Chip tone="gold">🎯 {client.goal || p?.goal}</Chip>
+                )}
+                {chips.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {chips.map((c) => (
+                      <Chip key={c}>{c}</Chip>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
+
+          {/* Динамика */}
+          <div className="grid grid-cols-3 gap-2">
+            <StatTile
+              label="Вес"
+              value={latestWeight ?? '—'}
+              unit={latestWeight != null ? 'кг' : undefined}
+              delta={wDelta != null ? { value: wDelta, good: 'down', unit: ' кг' } : undefined}
+            />
+            <StatTile label="Тренировок" value={workouts?.length ?? '—'} tone="energy" />
+            <StatTile label="Замеров" value={weights.length || '—'} tone="plain" />
+          </div>
+
+          {weights.length >= 2 && (
+            <div className="jf-tile p-3">
+              <div className="jf-eyebrow mb-1.5" style={{ color: 'var(--muted)' }}>
+                Динамика веса
+              </div>
+              <LineChart
+                unit=" кг"
+                points={[...weights]
+                  .reverse()
+                  .map((w) => ({
+                    value: w.weightKg as number,
+                    label: new Date(w.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }),
+                  }))}
+              />
             </div>
           )}
+
           {photos && photos.length > 0 && (
             <div className="flex flex-col gap-1">
               <div className="text-tg-hint text-xs font-medium">Фото прогресса</div>
