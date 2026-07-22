@@ -79,6 +79,7 @@ export interface MealPlanItem {
   id: string;
   mealType: MealType;
   title: string;
+  grams: number | null;
   kcal: number | null;
   protein: number | null;
   fat: number | null;
@@ -95,7 +96,11 @@ export interface MealPlan {
 export interface MealPlanDraftItem {
   mealType: MealType;
   title: string;
+  grams?: number | null;
   kcal?: number | null;
+  protein?: number | null;
+  fat?: number | null;
+  carbs?: number | null;
 }
 
 export interface Invite {

@@ -29,6 +29,7 @@ const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 interface PlanItemInput {
   mealType: MealType;
   title: string;
+  grams?: number | null;
   kcal?: number | null;
   protein?: number | null;
   fat?: number | null;
@@ -38,7 +39,7 @@ interface PlanItemInput {
 // Serialize a meal plan (+ items) for the API, resolving photo view URLs.
 function serializePlan(
   plan: { id: string; date: Date; note: string | null; items: Array<{
-    id: string; mealType: MealType; order: number; title: string;
+    id: string; mealType: MealType; order: number; title: string; grams: number | null;
     kcal: number | null; protein: number | null; fat: number | null; carbs: number | null;
     done: boolean; doneAt: Date | null; photoKey: string | null;
   }> },
@@ -53,6 +54,7 @@ function serializePlan(
         id: it.id,
         mealType: it.mealType,
         title: it.title,
+        grams: it.grams,
         kcal: it.kcal,
         protein: it.protein,
         fat: it.fat,
@@ -691,6 +693,7 @@ export const nutritionRoutes: FastifyPluginAsync = async (fastify) => {
           mealType: it.mealType,
           order: i,
           title: it.title.trim(),
+          grams: it.grams != null && Number.isFinite(Number(it.grams)) ? Number(it.grams) : null,
           kcal: num(it.kcal),
           protein: num(it.protein),
           fat: num(it.fat),

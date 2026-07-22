@@ -424,6 +424,7 @@ model MealPlanItem {
   mealType MealType
   order    Int      @default(0)
   title    String
+  grams    Float?   // portion; kcal/macros are computed from the food × grams
   kcal     Int?
   protein  Int?
   fat      Int?

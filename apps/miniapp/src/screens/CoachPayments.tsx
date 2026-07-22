@@ -119,11 +119,13 @@ function SubRow({ sub, onChanged }: { sub: Subscription; onChanged: () => void }
         <Avatar name={sub.clientName} size={38} />
         <div className="flex-1 min-w-0">
           <div className="font-semibold leading-tight truncate">{sub.clientName}</div>
-          <div className="text-brand-muted text-xs truncate">
+          <div className="text-brand-muted text-xs leading-snug">
             {sub.planName} · {sub.amount.toLocaleString('ru-RU')} ₽ / {sub.periodDays} дн.
           </div>
         </div>
-        <Chip tone={statusTone}>{STATUS_LABEL[sub.status]}</Chip>
+        <Chip tone={statusTone} className="shrink-0 self-start">
+          {STATUS_LABEL[sub.status]}
+        </Chip>
       </div>
 
       {sub.currentPeriodEnd && (

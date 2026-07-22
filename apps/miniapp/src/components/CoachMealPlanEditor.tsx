@@ -1,8 +1,9 @@
-// Coach-side meal-plan builder for one client. Add items per meal for a day
-// (today / tomorrow), save; the client then ticks them off with photo reports.
+// Coach-side meal-plan builder for one client. Each item is a food × grams;
+// kcal/macros are computed automatically. Unsaved edits are cached per
+// (client, date) in localStorage, so switching Today/Tomorrow never loses work.
 
-import { useEffect, useState } from 'react';
-import { api, type MealType } from '../api';
+import { useEffect, useRef, useState } from 'react';
+import { api, type MealType, type Macros, type FoodSearchItem } from '../api';
 import { Button } from './ui';
 
 const MEAL_LABELS: Record<MealType, string> = {
@@ -16,10 +17,14 @@ const MEALS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 interface Row {
   mealType: MealType;
   title: string;
-  kcal: string;
+  grams: string;
+  per100: Macros | null; // enables auto recompute on grams change
+  kcal: number | null;
+  protein: number | null;
+  fat: number | null;
+  carbs: number | null;
 }
 
-// Local YYYY-MM-DD, `offset` days from today.
 function ymd(offset = 0): string {
   const d = new Date();
   d.setDate(d.getDate() + offset);
@@ -27,9 +32,38 @@ function ymd(offset = 0): string {
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 }
 
+const blankRow = (mealType: MealType): Row => ({
+  mealType,
+  title: '',
+  grams: '',
+  per100: null,
+  kcal: null,
+  protein: null,
+  fat: null,
+  carbs: null,
+});
+
+// Recompute kcal/macros for a row from its per100 × grams.
+function recompute(r: Row): Row {
+  const g = Number(r.grams);
+  if (r.per100 && g > 0) {
+    const f = g / 100;
+    return {
+      ...r,
+      kcal: Math.round(r.per100.kcal * f),
+      protein: Math.round(r.per100.protein * f),
+      fat: Math.round(r.per100.fat * f),
+      carbs: Math.round(r.per100.carbs * f),
+    };
+  }
+  return r;
+}
+
 export function CoachMealPlanEditor({ clientId }: { clientId: string }) {
   const [when, setWhen] = useState<0 | 1>(0);
   const date = ymd(when);
+  const draftKey = `jf.mealplan.${clientId}.${date}`;
+
   const [rows, setRows] = useState<Row[]>([]);
   const [note, setNote] = useState('');
   const [doneInfo, setDoneInfo] = useState<{ done: number; total: number } | null>(null);
@@ -37,32 +71,98 @@ export function CoachMealPlanEditor({ clientId }: { clientId: string }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  function saveDraft(r: Row[], n: string) {
+    try {
+      if (r.length || n) localStorage.setItem(draftKey, JSON.stringify({ rows: r, note: n }));
+      else localStorage.removeItem(draftKey);
+    } catch {
+      /* ignore */
+    }
+  }
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setSaved(false);
+
+    // Prefer an unsaved local draft for this (client, date).
+    let draft: { rows: Row[]; note: string } | null = null;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) draft = JSON.parse(raw);
+    } catch {
+      draft = null;
+    }
+
     api
       .coachMealPlan(clientId, date)
       .then((r) => {
         if (!alive) return;
         const p = r.plan;
-        setRows(
-          p ? p.items.map((it) => ({ mealType: it.mealType, title: it.title, kcal: it.kcal != null ? String(it.kcal) : '' })) : [],
-        );
-        setNote(p?.note ?? '');
         setDoneInfo(p ? { done: p.items.filter((i) => i.done).length, total: p.items.length } : null);
+        if (draft) {
+          setRows(draft.rows);
+          setNote(draft.note);
+        } else if (p) {
+          setRows(
+            p.items.map((it) => {
+              const g = it.grams ?? 0;
+              const per100: Macros | null =
+                g > 0
+                  ? {
+                      kcal: ((it.kcal ?? 0) * 100) / g,
+                      protein: ((it.protein ?? 0) * 100) / g,
+                      fat: ((it.fat ?? 0) * 100) / g,
+                      carbs: ((it.carbs ?? 0) * 100) / g,
+                    }
+                  : null;
+              return {
+                mealType: it.mealType,
+                title: it.title,
+                grams: it.grams != null ? String(it.grams) : '',
+                per100,
+                kcal: it.kcal,
+                protein: it.protein,
+                fat: it.fat,
+                carbs: it.carbs,
+              };
+            }),
+          );
+          setNote(p.note ?? '');
+        } else {
+          setRows([]);
+          setNote('');
+        }
       })
-      .catch(() => alive && setRows([]))
+      .catch(() => {
+        if (!alive) return;
+        if (draft) {
+          setRows(draft.rows);
+          setNote(draft.note);
+        }
+      })
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, date]);
 
-  const addRow = (mealType: MealType) => setRows((r) => [...r, { mealType, title: '', kcal: '' }]);
-  const update = (i: number, p: Partial<Row>) =>
-    setRows((r) => r.map((row, j) => (j === i ? { ...row, ...p } : row)));
-  const remove = (i: number) => setRows((r) => r.filter((_, j) => j !== i));
+  function mutate(updater: (prev: Row[]) => Row[]) {
+    setRows((prev) => {
+      const next = updater(prev);
+      saveDraft(next, note);
+      return next;
+    });
+  }
+  const addRow = (mealType: MealType) => mutate((r) => [...r, blankRow(mealType)]);
+  const remove = (i: number) => mutate((r) => r.filter((_, j) => j !== i));
+  const update = (i: number, patch: Partial<Row>) =>
+    mutate((r) => r.map((row, j) => (j === i ? recompute({ ...row, ...patch }) : row)));
+  const changeNote = (n: string) => {
+    setNote(n);
+    saveDraft(rows, n);
+  };
 
   async function save() {
     setSaving(true);
@@ -73,8 +173,21 @@ export function CoachMealPlanEditor({ clientId }: { clientId: string }) {
         note: note.trim() || null,
         items: rows
           .filter((r) => r.title.trim())
-          .map((r) => ({ mealType: r.mealType, title: r.title.trim(), kcal: r.kcal ? Number(r.kcal) : null })),
+          .map((r) => ({
+            mealType: r.mealType,
+            title: r.title.trim(),
+            grams: r.grams ? Number(r.grams) : null,
+            kcal: r.kcal,
+            protein: r.protein,
+            fat: r.fat,
+            carbs: r.carbs,
+          })),
       });
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        /* ignore */
+      }
       setSaved(true);
     } finally {
       setSaving(false);
@@ -106,37 +219,14 @@ export function CoachMealPlanEditor({ clientId }: { clientId: string }) {
         <p className="text-brand-muted text-xs">Загрузка…</p>
       ) : (
         <>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2.5">
             {rows.map((row, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <select
-                  className="rounded-lg bg-brand-bg brand-line p-1.5 text-xs outline-none"
-                  value={row.mealType}
-                  onChange={(e) => update(i, { mealType: e.target.value as MealType })}
-                >
-                  {MEALS.map((m) => (
-                    <option key={m} value={m}>
-                      {MEAL_LABELS[m]}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  className="flex-1 min-w-0 rounded-lg bg-brand-bg brand-line p-1.5 text-sm outline-none"
-                  placeholder="напр. «Овсянка 60 г + банан»"
-                  value={row.title}
-                  onChange={(e) => update(i, { title: e.target.value })}
-                />
-                <input
-                  className="w-14 rounded-lg bg-brand-bg brand-line p-1.5 text-sm outline-none tabular"
-                  placeholder="ккал"
-                  inputMode="numeric"
-                  value={row.kcal}
-                  onChange={(e) => update(i, { kcal: e.target.value.replace(/[^0-9]/g, '') })}
-                />
-                <button className="text-brand-muted px-1" onClick={() => remove(i)} aria-label="Удалить">
-                  ✕
-                </button>
-              </div>
+              <FoodRow
+                key={i}
+                row={row}
+                onChange={(patch) => update(i, patch)}
+                onRemove={() => remove(i)}
+              />
             ))}
           </div>
 
@@ -152,7 +242,7 @@ export function CoachMealPlanEditor({ clientId }: { clientId: string }) {
             rows={2}
             placeholder="Заметка к плану (необязательно)"
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) => changeNote(e.target.value)}
           />
 
           <Button variant="primary" onClick={save} disabled={saving} className="p-3">
@@ -160,6 +250,107 @@ export function CoachMealPlanEditor({ clientId }: { clientId: string }) {
           </Button>
         </>
       )}
+    </div>
+  );
+}
+
+function FoodRow({
+  row,
+  onChange,
+  onRemove,
+}: {
+  row: Row;
+  onChange: (patch: Partial<Row>) => void;
+  onRemove: () => void;
+}) {
+  const [results, setResults] = useState<FoodSearchItem[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const justPicked = useRef(false);
+
+  // Debounced food search as the coach types (unless they just picked one).
+  useEffect(() => {
+    if (justPicked.current) {
+      justPicked.current = false;
+      return;
+    }
+    const q = row.title.trim();
+    if (q.length < 2) {
+      setResults(null);
+      setOpen(false);
+      return;
+    }
+    const t = setTimeout(() => {
+      api
+        .coachSearchFoods(q)
+        .then((r) => {
+          setResults(r.foods.slice(0, 8));
+          setOpen(true);
+        })
+        .catch(() => setResults(null));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [row.title]);
+
+  function pick(food: FoodSearchItem) {
+    justPicked.current = true;
+    setOpen(false);
+    onChange({ title: food.name, per100: food.per100, grams: row.grams || '100' });
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-1.5">
+        <select
+          className="rounded-lg bg-brand-bg brand-line p-1.5 text-xs outline-none"
+          value={row.mealType}
+          onChange={(e) => onChange({ mealType: e.target.value as MealType })}
+        >
+          {MEALS.map((m) => (
+            <option key={m} value={m}>
+              {MEAL_LABELS[m]}
+            </option>
+          ))}
+        </select>
+        <div className="relative flex-1 min-w-0">
+          <input
+            className="w-full rounded-lg bg-brand-bg brand-line p-1.5 text-sm outline-none"
+            placeholder="Продукт (напр. «Овсянка»)"
+            value={row.title}
+            onChange={(e) => onChange({ title: e.target.value, per100: null })}
+            onFocus={() => results && setOpen(true)}
+          />
+          {open && results && results.length > 0 && (
+            <ul className="absolute z-20 left-0 right-0 mt-1 rounded-xl bg-brand-surface2 brand-line max-h-44 overflow-y-auto shadow-lg">
+              {results.map((f) => (
+                <li key={f.id}>
+                  <button
+                    className="w-full text-left px-2.5 py-1.5 text-sm hover:bg-brand-bg"
+                    onClick={() => pick(f)}
+                  >
+                    {f.name}
+                    <span className="text-brand-muted text-[11px]"> · {Math.round(f.per100.kcal)} ккал/100г</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <input
+          className="w-16 rounded-lg bg-brand-bg brand-line p-1.5 text-sm outline-none tabular"
+          placeholder="грамм"
+          inputMode="numeric"
+          value={row.grams}
+          onChange={(e) => onChange({ grams: e.target.value.replace(/[^0-9]/g, '') })}
+        />
+        <button className="text-brand-muted px-1" onClick={onRemove} aria-label="Удалить">
+          ✕
+        </button>
+      </div>
+      <div className="text-[10px] pl-1" style={{ color: row.kcal != null ? 'var(--accent-strong)' : 'var(--muted)' }}>
+        {row.kcal != null
+          ? `${row.kcal} ккал · Б${row.protein} Ж${row.fat} У${row.carbs}`
+          : 'выбери продукт из списка — ккал посчитается сама'}
+      </div>
     </div>
   );
 }

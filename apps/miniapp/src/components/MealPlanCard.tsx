@@ -133,7 +133,11 @@ function PlanRow({
       </button>
       <div className={`flex-1 min-w-0 ${item.done ? 'opacity-60' : ''}`}>
         <div className={`text-sm ${item.done ? 'line-through' : 'font-medium'}`}>{item.title}</div>
-        {item.kcal != null && <div className="text-brand-muted text-[11px]">{item.kcal} ккал</div>}
+        <div className="text-brand-muted text-[11px]">
+          {[item.grams != null ? `${item.grams} г` : null, item.kcal != null ? `${item.kcal} ккал` : null]
+            .filter(Boolean)
+            .join(' · ')}
+        </div>
       </div>
       {item.photoUrl ? (
         <a href={item.photoUrl} target="_blank" rel="noreferrer" className="shrink-0">
