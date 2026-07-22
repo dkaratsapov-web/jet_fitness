@@ -30,6 +30,7 @@ import { LiveDot, Sparkline } from '../components/ui';
 import { OliviaTip, OliviaAvatar, OliviaFab } from '../components/Olivia';
 import { OliviaHelp } from '../components/OliviaHelp';
 import { Icon, type IconName } from '../components/Icon';
+import { BodySummaryCard } from '../components/BodySummary';
 
 // Which Olivia help branch matches each client tab (for the floating assistant).
 const TAB_BRANCH: Record<ClientTab, string> = {
@@ -670,6 +671,8 @@ function HealthTab({
         <p className="text-brand-accent text-[11px] font-bold uppercase tracking-[0.16em]">Здоровье</p>
         <h1 className="text-2xl font-semibold mt-0.5">Твои показатели</h1>
       </header>
+
+      <BodySummaryCard />
 
       <HealthRow
         icon="body"

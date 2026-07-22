@@ -412,6 +412,28 @@ export interface ClientChallenge {
 
 export type Sex = 'male' | 'female' | 'other';
 
+export interface BodySummary {
+  bmi: number | null;
+  bmiCategory: string | null;
+  weight: number | null;
+  weightDelta30: number | null;
+  goalType: 'lose' | 'maintain' | 'gain' | null;
+  kcalAvg7: number | null;
+  kcalTarget: number | null;
+  loggedDays7: number;
+  proteinAvg7: number | null;
+  proteinNeed: number | null;
+  workouts7: number;
+  wearable: {
+    date: string;
+    steps: number | null;
+    restingPulse: number | null;
+    sleepMin: number | null;
+    activeKcal: number | null;
+  } | null;
+  summary: string;
+}
+
 export type GoalType = 'lose' | 'maintain' | 'gain';
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'high' | 'athlete';
 
@@ -802,6 +824,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  bodySummary: () => request<BodySummary>('/api/client/body-summary'),
   clientProgress: () => request<ProgressEntry[]>('/api/client/progress'),
   deleteProgress: (id: string) =>
     request<{ ok: boolean }>(`/api/client/progress/${id}`, { method: 'DELETE' }),

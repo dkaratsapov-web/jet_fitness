@@ -191,6 +191,105 @@ export const clientRoutes: FastifyPluginAsync = async (fastify) => {
     return { ok: true };
   });
 
+  // ── Body / health summary ("как ты сейчас") ─────────────────────
+  fastify.get('/client/body-summary', { preHandler: fastify.requireAuth }, async (request) => {
+    const clientId = request.auth!.userId;
+    const now = Date.now();
+    const d7 = new Date(now - 7 * 86400000);
+    const d30 = new Date(now - 30 * 86400000);
+
+    const [profile, weights, target, meals, workouts7, wearable] = await Promise.all([
+      prisma.clientProfile.findUnique({ where: { userId: clientId } }),
+      prisma.progressEntry.findMany({
+        where: { clientId, weightKg: { not: null } },
+        orderBy: { date: 'desc' },
+        take: 60,
+        select: { date: true, weightKg: true },
+      }),
+      prisma.nutritionTarget.findFirst({ where: { clientId }, orderBy: { activeFrom: 'desc' } }),
+      prisma.mealLog.findMany({
+        where: { clientId, date: { gte: d7 } },
+        select: { date: true, kcal: true, protein: true },
+      }),
+      prisma.workoutLog.count({ where: { clientId, date: { gte: d7 } } }),
+      prisma.dailyMetric.findFirst({ where: { clientId }, orderBy: { date: 'desc' } }),
+    ]);
+
+    const weight = weights[0]?.weightKg ?? profile?.weightKg ?? null;
+    // Weight ~30 days ago: the oldest measurement within the last 30 days.
+    const old30 = [...weights].reverse().find((w) => w.date >= d30);
+    const weightDelta30 =
+      weight != null && old30?.weightKg != null && old30.weightKg !== weight
+        ? +(weight - old30.weightKg).toFixed(1)
+        : null;
+
+    const height = profile?.heightCm ?? null;
+    let bmi: number | null = null;
+    let bmiCategory: string | null = null;
+    if (weight && height) {
+      bmi = +(weight / Math.pow(height / 100, 2)).toFixed(1);
+      bmiCategory =
+        bmi < 18.5 ? 'недовес' : bmi < 25 ? 'норма' : bmi < 30 ? 'избыток' : 'ожирение';
+    }
+
+    // 7-day nutrition averages over logged days.
+    const byDay = new Map<string, { kcal: number; protein: number }>();
+    for (const m of meals) {
+      const k = m.date.toISOString().slice(0, 10);
+      const cur = byDay.get(k) ?? { kcal: 0, protein: 0 };
+      cur.kcal += m.kcal;
+      cur.protein += m.protein;
+      byDay.set(k, cur);
+    }
+    const loggedDays7 = byDay.size;
+    const kcalAvg7 = loggedDays7
+      ? Math.round([...byDay.values()].reduce((n, d) => n + d.kcal, 0) / loggedDays7)
+      : null;
+    const proteinAvg7 = loggedDays7
+      ? Math.round([...byDay.values()].reduce((n, d) => n + d.protein, 0) / loggedDays7)
+      : null;
+    const proteinNeed = weight ? Math.round(weight * 1.8) : null;
+
+    // Olivia's short readout.
+    const bits: string[] = [];
+    if (weightDelta30 != null) {
+      const dir = weightDelta30 < 0 ? 'снизился' : 'вырос';
+      bits.push(`вес ${dir} на ${Math.abs(weightDelta30)} кг за месяц`);
+    }
+    if (target && kcalAvg7 != null) {
+      const ratio = kcalAvg7 / target.kcal;
+      bits.push(ratio > 1.1 ? 'по калориям перебор' : ratio < 0.85 ? 'по калориям недобор' : 'калории в норме');
+    }
+    bits.push(workouts7 >= 3 ? `${workouts7} тренировки за неделю — отлично` : workouts7 > 0 ? `${workouts7} тренировки за неделю` : 'на этой неделе тренировок не было');
+    const summary = bits.length
+      ? bits.join(', ').replace(/^./, (c) => c.toUpperCase()) + '.'
+      : 'Заполни профиль и веди дневник — и я соберу твою сводку.';
+
+    return {
+      bmi,
+      bmiCategory,
+      weight,
+      weightDelta30,
+      goalType: profile?.goalType ?? null,
+      kcalAvg7,
+      kcalTarget: target?.kcal ?? null,
+      loggedDays7,
+      proteinAvg7,
+      proteinNeed,
+      workouts7,
+      wearable: wearable
+        ? {
+            date: wearable.date.toISOString().slice(0, 10),
+            steps: wearable.steps,
+            restingPulse: wearable.restingPulse,
+            sleepMin: wearable.sleepMin,
+            activeKcal: wearable.activeKcal,
+          }
+        : null,
+      summary,
+    };
+  });
+
   // Current client's active program (the one their coach handed them).
   fastify.get(
     '/client/program',
